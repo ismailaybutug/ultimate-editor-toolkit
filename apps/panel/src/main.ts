@@ -299,6 +299,37 @@ async function beatMarkersAction(p: { every: number }) {
   return { clip: d.name, bpm: r.bpm, confidence: r.confidence, markers: m.data.markers };
 }
 
+function framesFolder(): string {
+  if (!window.require) throw new Error('Node.js is not enabled in this panel');
+  const os = window.require('os'), path = window.require('path'), fs = window.require('fs');
+  const dir = path.join(os.homedir(), 'Pictures', 'UET Frames');
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+async function exportFrameAction(p: { importToProject: boolean }) {
+  const r = await callHost<any>('ppro', 'exportFrame', { folder: framesFolder(), importToProject: p.importToProject });
+  if (!r.ok) throw new Error(r.error);
+  return r.data;
+}
+
+const TIDY_KEY = 'uet.tidy.lastMoved';
+async function tidyAction(p: { dryRun: boolean }) {
+  const r = await callHost<any>('ppro', 'tidyProject', { dryRun: p.dryRun });
+  if (!r.ok) throw new Error(r.error);
+  if (!p.dryRun && r.data.moved.length) localStorage.setItem(TIDY_KEY, JSON.stringify(r.data.moved));
+  return r.data;
+}
+
+async function untidyAction() {
+  const moved = JSON.parse(localStorage.getItem(TIDY_KEY) ?? '[]');
+  if (!moved.length) throw new Error('Geri alınacak düzenleme yok.');
+  const r = await callHost<any>('ppro', 'untidyProject', { moved });
+  if (!r.ok) throw new Error(r.error);
+  localStorage.removeItem(TIDY_KEY);
+  return r.data;
+}
+
 async function applyRecipeById(p: { recipeId: string; duration?: number; stagger: number }) {
   const base = BUILTIN_RECIPES.find(x => x.id === p.recipeId);
   if (!base) throw new Error(`Unknown recipe ${p.recipeId}`);
@@ -329,6 +360,24 @@ function registerHostTools(reg: any) {
       title: { en: 'Detect tempo of the selected music clip and add sequence markers on beats', tr: 'Vuruş marker' },
       params: z.object({ every: z.number().int().min(1).max(16).default(4) }),
       run: beatMarkersAction,
+    });
+    reg.register({
+      id: 'ppro.exportFrame', app: 'ppro', destructive: false,
+      title: { en: 'Save the frame under the playhead as PNG (~/Pictures/UET Frames), optionally import it', tr: 'Kare dışa aktar' },
+      params: z.object({ importToProject: z.boolean().default(false) }),
+      run: exportFrameAction,
+    });
+    reg.register({
+      id: 'ppro.tidyProject', app: 'ppro', destructive: true,
+      title: { en: 'Sort root-level project items into bins by type (dryRun to preview); undo with ppro.untidyProject', tr: 'Proje düzeni' },
+      params: z.object({ dryRun: z.boolean().default(true) }),
+      run: tidyAction,
+    });
+    reg.register({
+      id: 'ppro.untidyProject', app: 'ppro', destructive: true,
+      title: { en: 'Undo the last project tidy (items back to root, empty UET bins removed)', tr: 'Proje düzenini geri al' },
+      params: z.object({}),
+      run: untidyAction,
     });
     reg.register({
       id: 'ppro.makeSubtitles', app: 'ppro', destructive: true,
@@ -385,6 +434,20 @@ function setupPremiere() {
     const r = await beatMarkersAction({ every: Number($<HTMLSelectElement>('beatEvery').value) });
     log(`${r.clip}: ${r.bpm} BPM. ${r.markers} vuruş marker'ı eklendi.`, 'ok');
   });
+  const fb = $<HTMLButtonElement>('frameBtn');
+  fb.onclick = busy(fb, async () => {
+    const r = await exportFrameAction({ importToProject: $<HTMLInputElement>('frameImport').checked });
+    log(r.exists ? `Kare kaydedildi (${r.timecode}): ${r.path}${r.imported ? ' · projeye eklendi' : ''}` : `Premiere kareyi yazmadı: ${r.path}`, r.exists ? 'ok' : 'err');
+  });
+  $('frameOpen').onclick = () => { try { window.require!('child_process').exec(`open "${framesFolder()}"`); } catch (e) { log((e as Error).message, 'err'); } };
+  const describeBins = (b: Record<string, number>) => Object.entries(b).map(([k, v]) => `${k.replace('UET ', '')}: ${v}`).join(', ');
+  const tp = $<HTMLButtonElement>('tidyPreview');
+  tp.onclick = busy(tp, async () => { const r = await tidyAction({ dryRun: true }); log(r.items ? `${r.items} öğe taşınacak → ${describeBins(r.bins)}` : 'Üst seviyede taşınacak öğe yok.', 'ok'); });
+  const tb = $<HTMLButtonElement>('tidyBtn');
+  const ub = $<HTMLButtonElement>('untidyBtn');
+  ub.disabled = !localStorage.getItem(TIDY_KEY);
+  tb.onclick = busy(tb, async () => { const r = await tidyAction({ dryRun: false }); log(`${r.moved.length} öğe klasörlere taşındı → ${describeBins(r.bins)}`, 'ok'); ub.disabled = !r.moved.length; });
+  ub.onclick = busy(ub, async () => { const r = await untidyAction(); log(`${r.restored} öğe eski yerine döndü.`, 'ok'); ub.disabled = true; });
   const subs = $<HTMLButtonElement>('subs');
   subs.onclick = busy(subs, async () => {
     log('Konuşma yazıya dökülüyor (yerel, birkaç dakika sürebilir)...');

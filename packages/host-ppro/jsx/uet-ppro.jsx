@@ -3,7 +3,7 @@
  * Non-destructive by design: cuts build a NEW sequence; the original is never changed (TD-004).
  * STATUS: UNVERIFIED in Premiere Pro until TEST_REPORT.md says otherwise.
  */
-/* global app, qe, ProjectItemType, Sequence */
+/* global app, qe, ProjectItemType, Sequence, File */
 var UET = UET || {};
 UET.ppro = (function () {
   var TICKS = 254016000000;
@@ -159,6 +159,109 @@ UET.ppro = (function () {
     } catch (e) { return fail(e); }
   }
 
+  /**
+   * Export the frame under the playhead as PNG (F-PROD-06). Uses the QE DOM (as in Adobe's PProPanel sample).
+   * args.folder: output folder; args.importToProject: also import the PNG.
+   */
+  function exportFrame(json) {
+    try {
+      var args = JSON.parse(json);
+      var seq = activeSeq();
+      app.enableQE();
+      var qs = qe.project.getActiveSequence();
+      if (!qs) throw new Error('QE: no active sequence.');
+      var tc = qs.CTI.timecode;
+      var safeName = String(seq.name).replace(/[^A-Za-z0-9_\-]+/g, '_');
+      var base = args.folder + '/' + safeName + '_' + String(tc).replace(/[^0-9]+/g, '-');
+      qs.exportFramePNG(tc, base);
+      var f = new File(base + '.png');
+      var path = f.exists ? f.fsName : (new File(base).exists ? new File(base).fsName : base + '.png');
+      var imported = false;
+      if (args.importToProject && new File(path).exists) {
+        app.project.importFiles([path], true, app.project.rootItem, false);
+        imported = true;
+      }
+      return ok({ path: path, timecode: tc, exists: new File(path).exists, imported: imported });
+    } catch (e) { return fail(e); }
+  }
+
+  var TIDY = {
+    'UET Video': /\.(mp4|mov|mxf|avi|mkv|m4v|mts|m2ts|r3d|braw|webm|wmv|3gp)$/i,
+    'UET Audio': /\.(wav|mp3|aac|m4a|aif|aiff|flac|ogg|wma)$/i,
+    'UET Images': /\.(png|jpe?g|tiff?|psd|gif|webp|heic|exr|dpx|bmp|svg|ai|eps)$/i,
+    'UET Graphics': /\.(mogrt|aegraphic|prproj|aep)$/i
+  };
+
+  function findOrCreateBin(name) {
+    var root = app.project.rootItem, i;
+    for (i = 0; i < root.children.numItems; i++) {
+      var c = root.children[i];
+      if (c.type === ProjectItemType.BIN && c.name === name) return c;
+    }
+    return root.createBin(name);
+  }
+
+  /**
+   * Project Tidy (F-PROD-02): move ROOT-level items into bins by type. Items already inside bins are left alone.
+   * args.dryRun: only report. Returns moved nodeIds so untidy() can put them back.
+   */
+  function tidyProject(json) {
+    try {
+      var args = JSON.parse(json || '{}');
+      var root = app.project.rootItem, plan = [], i;
+      for (i = 0; i < root.children.numItems; i++) {
+        var it = root.children[i];
+        if (it.type === ProjectItemType.BIN) continue;
+        var bin = null, path = '';
+        try { if (it.isSequence && it.isSequence()) bin = 'UET Sequences'; } catch (e1) { /* older */ }
+        if (!bin) {
+          try { path = it.getMediaPath() || ''; } catch (e2) { path = ''; }
+          var k;
+          for (k in TIDY) { if (TIDY.hasOwnProperty(k) && TIDY[k].test(path)) { bin = k; break; } }
+        }
+        if (!bin) bin = 'UET Other';
+        plan.push({ item: it, nodeId: it.nodeId, name: it.name, bin: bin });
+      }
+      var counts = {}, moved = [];
+      for (i = 0; i < plan.length; i++) counts[plan[i].bin] = (counts[plan[i].bin] || 0) + 1;
+      if (!args.dryRun) {
+        var bins = {};
+        for (i = 0; i < plan.length; i++) {
+          var b = bins[plan[i].bin] || (bins[plan[i].bin] = findOrCreateBin(plan[i].bin));
+          plan[i].item.moveBin(b);
+          moved.push(plan[i].nodeId);
+        }
+      }
+      return ok({ items: plan.length, bins: counts, moved: moved, dryRun: !!args.dryRun });
+    } catch (e) { return fail(e); }
+  }
+
+  function findByNodeId(bin, id) {
+    var i;
+    for (i = 0; i < bin.children.numItems; i++) {
+      var c = bin.children[i];
+      if (c.nodeId === id) return c;
+      if (c.type === ProjectItemType.BIN) { var f = findByNodeId(c, id); if (f) return f; }
+    }
+    return null;
+  }
+
+  /** Undo tidyProject: move the given nodeIds back to the project root; remove UET bins that became empty. */
+  function untidyProject(json) {
+    try {
+      var args = JSON.parse(json), root = app.project.rootItem, n = 0, i;
+      for (i = 0; i < args.moved.length; i++) {
+        var it = findByNodeId(root, args.moved[i]);
+        if (it) { it.moveBin(root); n++; }
+      }
+      for (i = root.children.numItems - 1; i >= 0; i--) {
+        var c = root.children[i];
+        if (c.type === ProjectItemType.BIN && /^UET /.test(c.name) && c.children.numItems === 0) c.deleteBin();
+      }
+      return ok({ restored: n });
+    } catch (e) { return fail(e); }
+  }
+
   /** Spike S2: report which QE DOM features exist on this Premiere build. Changes nothing. */
   function qeProbe() {
     try {
@@ -178,5 +281,5 @@ UET.ppro = (function () {
     } catch (e) { return fail(e); }
   }
 
-  return { ping: ping, getSelectedClipInfo: getSelectedClipInfo, addMarkers: addMarkers, buildFromRanges: buildFromRanges, importCaptions: importCaptions, qeProbe: qeProbe, TICKS: TICKS };
+  return { ping: ping, getSelectedClipInfo: getSelectedClipInfo, addMarkers: addMarkers, buildFromRanges: buildFromRanges, importCaptions: importCaptions, exportFrame: exportFrame, tidyProject: tidyProject, untidyProject: untidyProject, qeProbe: qeProbe, TICKS: TICKS };
 }());
