@@ -7,7 +7,7 @@ A feature is "verified" only with H results recorded here, including app version
 ## Environments
 | Machine | OS | Premiere | After Effects | Notes |
 |---|---|---|---|---|
-| İso's MacBook Air (Apple Silicon) | macOS (version TBD) | 2026 (26.5.2 seen 2026-10-29) | TBD | Local Premiere MCP bridge present |
+| İso's MacBook Air (Apple Silicon) | macOS (version TBD) | 2026 (26.5.2 seen 2026-10-29) | 2026 | Local Premiere MCP bridge present; Node v24; ffmpeg 6.0 in ~/.local/bin; no Homebrew |
 
 ## Results
 
@@ -22,7 +22,8 @@ A feature is "verified" only with H results recorded here, including app version
 | `tests/transcript.test.ts` (whisper `-ojf` JSON → words, captions, SRT, timeline mapping; Engine `audio.transcribe` with a fake `whisper-cli` test double; missing-model error) | U/G | 6/6 pass |
 | ES3 syntax check of both `.jsx` files | G | pass |
 | Panel loads in headless Chromium, no JS errors | G | pass |
-| **Premiere Pro / After Effects** | H | **not run yet — everything above is unverified in the real apps** |
+| H-B1 Premiere 2026: panel 0.1.2 installs (Remote Control ran install-mac.sh with İso's approval), opens via Window > Extensions, and works (İso, 2026-11-10 11:45 UTC: "çalışıyor"; exact button tested not reported, assumed ping) | H | **pass (partial, İso's word only)** |
+| All other Premiere / After Effects tests (silence, markers, rebuild, loudness, AE recipes, speed ramp, MCP, subtitles) | H | not run yet: unverified |
 
 ## Known bugs
 None (no code).
