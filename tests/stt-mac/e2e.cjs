@@ -43,6 +43,10 @@ const log = (k, v) => console.log(`\n=== ${k}\n${typeof v === 'string' ? v : JSO
   const sm = await reg.call('subtitles.make', { file: mp4, language: 'tr', style: 'highlight', formats: ['srt', 'vtt', 'ass', 'json'], overlay: true, width: 1080, height: 1920, fps: 30, outDir: out });
   log('subtitles.make', sm);
   if (!sm.overlay || !existsSync(sm.overlay.path) || statSync(sm.overlay.path).size < 1000) throw new Error('overlay missing');
+  const alpha = execFileSync(eng.FFMPEG, ['-v', 'error', '-ss', '0.5', '-i', sm.overlay.path, '-frames:v', '1', '-vf', 'format=rgba,alphaextract', '-f', 'rawvideo', '-pix_fmt', 'gray', '-']);
+  const opaque = alpha.filter(a => a > 200).length;
+  log('overlay alpha', { opaquePixels: opaque, total: alpha.length });
+  if (opaque === 0 || opaque > alpha.length / 2) throw new Error('overlay is not transparent with visible text');
   log('srt', require('node:fs').readFileSync(sm.files.srt, 'utf8'));
 
   const fillerText = 'Eee, bugün şey, ııı, yeni bir eklenti deniyoruz. Hmm, ben ben çok beğendim.';

@@ -59,8 +59,11 @@ export async function renderOverlay(captions: Caption[], styleId: string, o: { w
     const codec = o.codec === 'prores'
       ? ['-c:v', 'prores_ks', '-profile:v', '4444', '-pix_fmt', 'yuva444p10le', '-vendor', 'apl0']
       : ['-c:v', 'qtrle', '-pix_fmt', 'argb'];
-    const r = await ffmpegIn(dir, ['-v', 'error', '-y', '-f', 'lavfi', '-i', `color=c=black@0.0:s=${o.width}x${o.height}:r=${o.fps}:d=${dur.toFixed(3)},format=rgba`,
-      '-vf', 'format=rgba,ass=subs.ass:alpha=1', ...codec, '-an', 'out.mov']);
+    const src = `color=c=black@0.0:s=${o.width}x${o.height}:r=${o.fps}:d=${dur.toFixed(3)},format=rgba`;
+    const go = (filter: string) => ffmpegIn(dir, ['-v', 'error', '-y', '-f', 'lavfi', '-i', src, '-vf', filter, ...codec, '-an', 'out.mov']);
+    // ffmpeg 4.4-7 need alpha=1 to draw into the alpha channel; builds without that option get the plain filter.
+    let r = await go('format=rgba,ass=subs.ass:alpha=1');
+    if (r.code !== 0 && /No option name|Option 'alpha' not found|alpha.*not found/i.test(r.stderr)) r = await go('format=rgba,ass=subs.ass');
     if (r.code !== 0) throw new Error(/No such filter: 'ass'|Filter not found/.test(r.stderr)
       ? 'Bu ffmpeg sürümünde altyazı çizici (libass) yok.' : `ffmpeg overlay failed: ${r.stderr.slice(-400)}`);
     mkdirSync(dirname(o.out), { recursive: true });
