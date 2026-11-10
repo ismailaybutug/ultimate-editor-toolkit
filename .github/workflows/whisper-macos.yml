@@ -1,0 +1,47 @@
+# Builds the whisper.cpp command-line tool for Apple Silicon Macs (Metal, static, ad-hoc signed) and publishes it as a
+# GitHub Release asset, so the Engine can install it on a Mac without Homebrew or Xcode (TECHNICAL_DECISIONS TD-005).
+# The second job installs it on a clean macOS runner through the Engine's own installer and runs a real transcription.
+name: whisper-macos
+on:
+  push:
+    branches: [claude/project-thread-le0iqv]
+    paths: ['.github/workflows/whisper-macos.yml', 'packages/engine/src/whisper*.ts', 'packages/engine/src/stt*.ts', 'packages/core/src/transcript*.ts', 'tests/stt-mac/**']
+  workflow_dispatch:
+permissions:
+  contents: write
+env:
+  WHISPER_TAG: v1.8.7
+  RELEASE_TAG: whisper-cli-v1.8.7-1
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Skip if the release already exists (assets are immutable once published)
+        id: chk
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          if gh release view "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then echo "exists=1" >> "$GITHUB_OUTPUT"; else echo "exists=0" >> "$GITHUB_OUTPUT"; fi
+      - name: Build whisper-cli (arm64, Metal embedded, static ggml)
+        if: steps.chk.outputs.exists == '0'
+        run: |
+          git clone --depth 1 --branch "$WHISPER_TAG" https://github.com/ggml-org/whisper.cpp wsrc
+          cmake -S wsrc -B wbuild -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
+            -DGGML_METAL=ON -DGGML_METAL_EMBED_LIBRARY=ON -DGGML_NATIVE=OFF \
+            -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_SERVER=OFF -DWHISPER_SDL2=OFF \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
+          cmake --build wbuild -j 4 --config Release --target whisper-cli
+          cp wbuild/bin/whisper-cli whisper-cli
+          echo "--- linked libraries (must be system only) ---"; otool -L whisper-cli
+          if otool -L whisper-cli | tail -n +2 | grep -v -E '^\s*(/usr/lib/|/System/Library/)'; then echo "non-system dylib linked"; exit 1; fi
+          codesign --force --sign - whisper-cli
+          ./whisper-cli --help 2>&1 | head -3
+          gzip -9 -c whisper-cli > whisper-cli-macos-arm64.gz
+          shasum -a 256 whisper-cli whisper-cli-macos-arm64.gz | tee SHA256SUMS
+          ls -l whisper-cli whisper-cli-macos-arm64.gz
+      - name: Publish release
+        if: steps.chk.outputs.exists == '0'
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          gh release create "$RELEASE_TAG" whisper-cli-macos-arm64.gz SHA256SUMS -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "whisper-cli $WHISPER_TAG for Apple Silicon (UET)" --prerelease \
+            --notes "whisper.cpp $WHISPER_TAG whisper-cli, arm64, Metal embedded, static, ad-hoc signed. Built by .github/workflows/whisper-macos.yml. Downloaded by the UET Engine (packages/engine/src/stt-setup.ts)."
