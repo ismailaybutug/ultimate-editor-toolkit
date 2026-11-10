@@ -13,6 +13,10 @@ env:
   WHISPER_TAG: v1.8.7
   RELEASE_TAG: whisper-cli-v1.8.7-1
 jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "actions work"; uname -a
   build:
     runs-on: macos-14
     steps:
