@@ -22,7 +22,8 @@ yet → every host feature below is UNVERIFIED.**
 | Scene Detect (`video.detectScenes`, `ppro.detectScenes`) | ffmpeg scene score → markers or new sequence split at cuts | Synthetic 3-shot video test passes; **unverified in Premiere** |
 | Beat Markers (`audio.detectBeats`, `ppro.beatMarkers`) | Own onset/tempo tracker (no extra install) → BPM + markers every N beats | Synthetic 120 BPM click track: BPM ±3, beats within 40 ms; **not yet tested on real music or in Premiere** |
 | Frame Export + Project Tidy (`ppro.exportFrame`, `ppro.tidyProject`/`untidyProject`) | QE exportFramePNG at playhead; root items → typed bins with undo | Mock-DOM tests pass; **unverified in Premiere** (QE exportFramePNG and moveBin behaviour) |
-| Dev build | `uet-panel-dev-0.1.5.zip` + `install-mac.sh` + Turkish test guide | Waiting for İso's Mac test |
+| AE motion module (PR #2, AE thread): text animator presets (F-MG-04), shake (F-MG-08), counter (part of F-MG-06), 3D carousel (F-MG-05), layout utilities | `apps/panel/src/modules/ae-motion.ts`, `uet-ae-motion.jsx`, `uet-ae-layout.jsx`, `core/src/motion` | U/G tests pass (26 in `tests/ae-motion.test.ts`); **unverified in After Effects** (guide: `tests/host/AE_MOTION_TEST_TR.md`) |
+| Dev build | `uet-panel-dev-0.1.6.zip` + `install-mac.sh` + Turkish test guide | Waiting for İso's Mac test |
 
 ## Blockers / waiting on İso
 1. Run the Mac test (`tests/host/PHASE2_MAC_TEST_TR.md`) and send results + Premiere/AE versions.
