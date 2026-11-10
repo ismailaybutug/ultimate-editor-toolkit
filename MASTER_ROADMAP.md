@@ -37,8 +37,7 @@ Objectives: prove every risky integration with real code before scaling features
 - Wave B: titles & graphics generators (+MOGRT export), text presets, callouts, 3D carousel, backgrounds,
   transitions (+builder), reframe, multiscreen, Style Cards + Style Studio, auto edit to beats, timestamps.
 - Wave C (hard): rough cut (fillers/retakes), podcast auto-switch, tracking (blur/attach/stabilise), dialogue
-  separation, voiceover/TTS, shorts extraction, cover + platform export, Premiere speed ramps (best available path),
-  URL import per TD-012.
+  separation, voiceover/TTS, shorts extraction, cover + platform export, Premiere speed ramps (best available path),. (URL downloader cancelled, TD-012.)
 - Acceptance: every FEATURE_INVENTORY baseline item is Done (H-tested) or explicitly "Limited" with reason + İso
   sign-off. Checkpoint per wave.
 

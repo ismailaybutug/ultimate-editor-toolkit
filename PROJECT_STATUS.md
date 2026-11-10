@@ -18,9 +18,8 @@ None. Waiting for approval.
 
 ## Blockers / decisions needed from İso
 1. Approve Phase 0–1 (architecture, Phase 2 scope) — required before implementation.
-2. TD-012: URL downloader approach (recommended: direct-URL import + Pacing Analyzer, no platform downloader).
-3. After Effects version on the MacBook Air (Premiere 26.5.2 is known from the prototype test on 2026-10-29).
-4. GitHub push access: repo `ismailaybutug/ultimate-editor-toolkit` exists (empty) but the Claude session's GitHub
+2. After Effects version on the MacBook Air (Premiere 26.5.2 is known from the prototype test on 2026-10-29).
+3. GitHub push access: repo `ismailaybutug/ultimate-editor-toolkit` exists (empty) but the Claude session's GitHub
    account (`iaybutug42-glitch`) could not push on 2026-11-10. Fix: add `iaybutug42-glitch` as a collaborator on
    the repo, or reconnect GitHub in claude.ai with the `ismailaybutug` account. Until then the docs live in the
    project Library folder `ultimate-editor-toolkit/`.

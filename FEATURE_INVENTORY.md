@@ -112,7 +112,8 @@ parametric tools rather than matching counts (brief §13).
 - **Original:** download from YouTube/Instagram/TikTok/X/Vimeo etc.; quality Best/4K/2K/1080/720; video, MP3/WAV,
   cover JPG/PNG, SRT; drops at playhead on empty track; batch/playlist; rights warning. "Pacing analysis before
   copying" (analyse a reference video's cut rhythm).
-- **Impl:** technically yt-dlp + ffmpeg. **Legal/ToS risk** (platform terms prohibit downloading; Adobe Exchange may
+- **STATUS: CANCELLED by İso on 2026-11-10 ("video indiriciyi iptal et"). Not in scope. Do not implement.**
+- **Impl (for the record only):** technically yt-dlp + ffmpeg. **Legal/ToS risk** (platform terms prohibit downloading; Adobe Exchange may
   reject). **Decision needed from İso: TD-012.** Proposed: ship "Import from URL" only for direct media URLs and
   user's own cloud links; offer **Pacing Analyzer** on any local file (shot length histogram, cut rhythm, average
   shot length) which delivers the creative value without the downloader.

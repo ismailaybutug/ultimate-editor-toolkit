@@ -5,7 +5,7 @@ Priority: P0 blocking · P1 next · P2 later. Owner role in brackets (see AGENT_
 ## Phase 0–1 follow-ups
 - [ ] P0 T0-01 İso approves Phase 0–1 docs and TD-001…TD-013. [İso]
 - [ ] P0 T0-02 Fix GitHub push access (collaborator or reconnect) and push docs. [İso → orchestrator]
-- [ ] P1 T0-03 İso decides TD-012 (downloader). [İso]
+- [x] T0-03 TD-012 decided: downloader cancelled (2026-11-10).
 - [ ] P1 T0-04 Watch UmutcanFX public demo videos / blog / preview lessons; add any missing features and
       confirm which panel owns each tool (rows marked "inferred"). [architect]
 - [ ] P2 T0-05 Optional: code-level audit of Creative Universe source if İso uploads `creative-universe/source`. [architect]

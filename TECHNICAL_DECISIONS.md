@@ -49,7 +49,9 @@ Format: ID · decision · status · alternatives · reason · sources. Status: P
 - We never copy UmutcanFX presets, graphics, names, LUTs, SFX or UI. SFX/LUT sources: own production, CC0, or
   licensed with records. Every asset has a licence entry in `/assets/LICENSES.json`.
 
-## TD-012 URL downloader — Proposed, **needs İso's decision**
+## TD-012 URL downloader — **Decided 2026-11-10: cancelled by İso** ("video indiriciyi iptal et")
+- No YouTube/TikTok/social downloader in scope. The proposed replacement (direct-URL import + local Pacing
+  Analyzer) is NOT approved either; it stays an open idea only.
 - Options: (a) full yt-dlp downloader like UmutcanFX; (b) direct-URL import + local Pacing Analyzer only (recommended);
   (c) skip.
 - Reason for (b): platform terms of service forbid downloading; Adobe Exchange listing risk; legal exposure for a
