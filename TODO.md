@@ -17,7 +17,7 @@ Priority: P0 blocking · P1 next · P2 later. Owner role in brackets (see AGENT_
 - [~] P1 T2-S2 Premiere CEP spike — code done (razor/setSpeed only probed), waiting for H test: (markers, rebuild-from-ranges, QE razor, QE setSpeed on 26.5.x). [PR dev]
 - [ ] P1 T2-S3 Premiere UXP spike (same ops). [PR dev]
 - [~] P1 T2-S4 Engine spike — server + ffmpeg analysis done; whisper.cpp + Mac benchmark open: (launch, WS handshake, ffmpeg, whisper.cpp benchmark on Apple Silicon). [perf]
-- [ ] P1 UI shell v2 (İso 2026-11-10: "UmutcanFX was more advanced, this looks very basic"): dark pro theme, category cards, tool search, previews. Mock screenshot to İso first.
+- [~] P1 UI shell v2 — first version built (card catalog `apps/panel/src/catalog.ts`, categories, search ⌘K, favourites, toast/status bar, CSS previews; planned tools shown as disabled "Yakında" cards, never faked). Screenshots sent to İso; waiting for feedback. Was: (İso 2026-11-10: "UmutcanFX was more advanced, this looks very basic"): dark pro theme, category cards, tool search, previews. Mock screenshot to İso first.
 - [ ] P1 Install whisper on İso's Mac (needs Homebrew, which needs İso's password) + model to ~/.uet/models.
 - [~] P1 T2-S4b whisper.cpp transcription — code + tests done (`packages/engine/src/whisper.ts`, `packages/core/src/transcript.ts`); H test guide section D; record realtime factor in TEST_REPORT.
 - [~] P1 T2-S5 MCP spike — server done + automated test; Claude Desktop H test (guide section C) pending.

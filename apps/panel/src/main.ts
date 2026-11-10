@@ -1,6 +1,7 @@
 // Panel UI for Premiere Pro and After Effects (CEP). Kept dependency-free for the Phase 2 spike.
 import { BUILTIN_RECIPES, retimeRecipe, buildRampKeyframes } from '@uet/core';
 import { z } from 'zod';
+import { CATALOG, CATEGORIES, STATUS_LABEL, type CatalogItem, type App } from './catalog';
 
 declare global {
   interface Window {
@@ -13,15 +14,23 @@ type HostResult<T = any> = { ok: true; data: T } | { ok: false; error: string; l
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const logEl = $('log');
+let toastTimer: any;
 function log(msg: string, kind: 'ok' | 'err' | '' = '') {
   const line = document.createElement('div');
   if (kind) line.className = kind + 'c';
   line.textContent = `${new Date().toLocaleTimeString()}  ${msg}`;
   logEl.prepend(line);
+  $('status').textContent = msg.length > 70 ? msg.slice(0, 70) + '…' : msg;
+  const t = $('toast');
+  t.textContent = msg; t.className = `show ${kind ? kind + 'c' : ''}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.className = ''; }, kind === 'err' ? 9000 : 5000);
 }
 
 const cep = window.__adobe_cep__;
 const hostApp: 'PPRO' | 'AEFT' | 'BROWSER' = cep ? JSON.parse(cep.getHostEnvironment()).appName : 'BROWSER';
+// Browser preview (no Adobe): ?app=AEFT shows the After Effects catalog.
+const previewApp = new URLSearchParams(location.search).get('app') === 'AEFT' ? 'AEFT' : 'PPRO';
 
 function extensionPath(): string {
   if (!cep) return '.';
@@ -64,28 +73,117 @@ async function startEngine() {
     engine = { call: (id, p) => reg.call(id, p) };
     const info = await engine.call('engine.ping', {});
     try { await mod.startServer(reg, {}); } catch { /* another engine may already listen; direct calls still work */ }
-    el.textContent = `motor: hazır (${info.version})`;
-    el.className = 'okc';
+    el.innerHTML = `<i></i>motor ${info.version}`;
+    el.className = 'pill okc';
+    el.title = 'Yerel motor çalışıyor';
   } catch (e) {
-    el.textContent = 'motor: kapalı';
-    el.className = 'errc';
+    el.innerHTML = '<i></i>motor kapalı';
+    el.className = 'pill errc';
     log(`Motor başlatılamadı: ${(e as Error).message}`, 'err');
   }
 }
 
-// ---------- Tabs ----------
-function setupTabs() {
-  const sections = Array.from(document.querySelectorAll<HTMLElement>('section'))
-    .filter(s => hostApp === 'BROWSER' || s.dataset.app === hostApp);
-  document.querySelectorAll<HTMLElement>('section').forEach(s => { if (!sections.includes(s)) s.remove(); });
-  const nav = $('tabs');
-  sections.forEach((s, i) => {
-    const b = document.createElement('button');
-    b.textContent = s.dataset.tab ?? '?';
-    b.onclick = () => { sections.forEach(x => x.classList.remove('on')); nav.querySelectorAll('button').forEach(x => x.classList.remove('on')); s.classList.add('on'); b.classList.add('on'); };
-    nav.appendChild(b);
-    if (i === 0) b.click();
+// ---------- Shell: cards, categories, search, tool views ----------
+const PREVIEW: Record<string, string> = {
+  wave: '<div class="bars">' + [6,14,22,18,9,0,0,0,12,26,20,8,0,0,16,24,10].map((h, i) => h ? `<span style="height:${h}px;animation-delay:${i * 0.07}s"></span>` : '<span class="gap"></span>').join('') + '</div>',
+  meter: '<div class="meter"></div>',
+  captions: '<div class="cap">Merhaba <em>arkadaşlar</em></div>',
+  pop: '<div class="box"></div>',
+  ramp: '<svg class="curve" viewBox="0 0 100 40" preserveAspectRatio="none"><path d="M0 34 C 25 34, 30 6, 50 6 S 75 34, 100 34"/></svg>',
+  title: '<div class="title"><i></i><i></i></div>',
+  transition: '<div class="wipe"></div>',
+  grid: '<div class="cells">' + '<i></i>'.repeat(8) + '</div>',
+  spark: '<div class="spark">' + [[18,30],[40,14],[62,34],[80,18],[50,26]].map(([x, y], i) => `<i style="left:${x}%;top:${y}px;animation-delay:${i * 0.4}s"></i>`).join('') + '</div>',
+  dev: '<div class="code">ping → ok</div>',
+};
+const FAV_KEY = 'uet.favs';
+const favs = new Set<string>(JSON.parse(localStorage.getItem(FAV_KEY) ?? '[]'));
+let activeCat = 'all';
+
+function shellApp(): App { return hostApp === 'BROWSER' ? previewApp : hostApp === 'AEFT' ? 'AEFT' : 'PPRO'; }
+function catColor(app: App, cat: string) { return CATEGORIES[app].find(c => c.id === cat)?.color ?? '#9aa4b2'; }
+
+function cardHtml(it: CatalogItem): string {
+  const c = catColor(it.app, it.cat);
+  const fav = favs.has(it.app + it.id);
+  return `<button class="card ${it.status}" data-id="${it.id}" style="--c:${c};--cg:${c}38" ${it.status === 'soon' ? 'title="Henüz yok, planlandı (' + (it.feature ?? '') + ')"' : ''}>
+    <div class="pv">${PREVIEW[it.preview] ?? ''}<span class="badge ${it.status}">${STATUS_LABEL[it.status]}</span>
+    ${it.status !== 'soon' ? `<span class="star ${fav ? 'on' : ''}" data-fav="${it.id}">★</span>` : ''}</div>
+    <div class="meta"><b>${it.title}</b><p>${it.desc}</p></div></button>`;
+}
+
+function renderHome() {
+  const app = shellApp();
+  const q = $<HTMLInputElement>('q').value.trim().toLocaleLowerCase('tr');
+  const items = CATALOG.filter(it => it.app === app)
+    .filter(it => activeCat === 'all' || (activeCat === 'fav' ? favs.has(it.app + it.id) : it.cat === activeCat))
+    .filter(it => !q || `${it.title} ${it.desc} ${it.keys ?? ''}`.toLocaleLowerCase('tr').includes(q));
+  const order = { beta: 0, dev: 2, soon: 1 } as const;
+  let html = '';
+  for (const cat of CATEGORIES[app]) {
+    const list = items.filter(i => i.cat === cat.id).sort((a, b) => order[a.status] - order[b.status]);
+    if (!list.length) continue;
+    html += `<div class="group" style="--c:${cat.color}">${cat.label}</div><div class="grid">${list.map(cardHtml).join('')}</div>`;
+  }
+  const home = $('home');
+  home.innerHTML = html || '<div class="empty">Sonuç yok. Başka bir kelime dene.</div>';
+  home.querySelectorAll<HTMLElement>('[data-fav]').forEach(s => s.onclick = e => {
+    e.stopPropagation();
+    const k = app + s.dataset.fav; favs.has(k) ? favs.delete(k) : favs.add(k);
+    localStorage.setItem(FAV_KEY, JSON.stringify([...favs])); renderHome();
   });
+  home.querySelectorAll<HTMLElement>('.card').forEach(c => c.onclick = () => {
+    const it = CATALOG.find(x => x.app === app && x.id === c.dataset.id);
+    if (it?.view) openView(it);
+  });
+}
+
+function openView(it: CatalogItem) {
+  $('home').style.display = 'none';
+  $('chips').style.display = 'none';
+  document.querySelectorAll<HTMLElement>('.view').forEach(v => v.classList.remove('on'));
+  const v = $(it.view!);
+  if (!v.querySelector('.vhead')) {
+    const h = document.createElement('div');
+    h.className = 'vhead';
+    h.innerHTML = `<button class="back" title="Geri">←</button><b>${it.title}</b><span class="badge ${it.status}">${STATUS_LABEL[it.status]}</span>`;
+    (h.querySelector('.back') as HTMLElement).onclick = closeView;
+    v.prepend(h);
+  }
+  v.classList.add('on');
+  $('main').scrollTop = 0;
+}
+
+function closeView() {
+  document.querySelectorAll<HTMLElement>('.view').forEach(v => v.classList.remove('on'));
+  $('home').style.display = '';
+  $('chips').style.display = '';
+}
+
+function setupShell() {
+  const app = shellApp();
+  $('hostName').textContent = app === 'AEFT' ? 'After Effects' : 'Premiere Pro';
+  document.querySelectorAll<HTMLElement>('.view').forEach(v => { if (v.dataset.app !== app) v.remove(); });
+  const chips = $('chips');
+  const all = [{ id: 'all', label: 'Tümü', color: '#eceef3' }, { id: 'fav', label: '★ Favoriler', color: '#ffd166' }, ...CATEGORIES[app]];
+  chips.innerHTML = all.map(c => `<button class="chip ${c.id === activeCat ? 'on' : ''}" data-cat="${c.id}" style="--c:${c.color}">${c.label}</button>`).join('');
+  chips.querySelectorAll<HTMLElement>('.chip').forEach(b => b.onclick = () => {
+    activeCat = b.dataset.cat!;
+    chips.querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x === b));
+    renderHome();
+  });
+  const q = $<HTMLInputElement>('q');
+  q.oninput = () => { closeView(); renderHome(); };
+  q.onkeydown = e => {
+    if (e.key === 'Enter') { const first = document.querySelector<HTMLElement>('.card.beta, .card.dev'); first?.click(); }
+    if (e.key === 'Escape') { q.value = ''; renderHome(); }
+  };
+  document.addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); q.focus(); q.select(); }
+    if (e.key === 'Escape' && document.activeElement !== q) closeView();
+  });
+  $('logToggle').onclick = () => $('log').classList.toggle('open');
+  renderHome();
 }
 
 function busy<T>(btn: HTMLButtonElement, fn: () => Promise<T>) {
@@ -255,8 +353,8 @@ function setupAfterEffects() {
 }
 
 async function init() {
-  setupTabs();
-  if (hostApp === 'BROWSER') { log('Tarayıcı modunda: Adobe bağlantısı yok.'); return; }
+  setupShell();
+  if (hostApp === 'BROWSER') { $('status').textContent = 'Tarayıcı önizlemesi: Adobe bağlantısı yok.'; return; }
   await loadHostLibrary();
   if (hostApp === 'PPRO') setupPremiere(); else setupAfterEffects();
   await startEngine();
