@@ -23,6 +23,7 @@ yet → every host feature below is UNVERIFIED.**
 | Beat Markers (`audio.detectBeats`, `ppro.beatMarkers`) | Own onset/tempo tracker (no extra install) → BPM + markers every N beats | Synthetic 120 BPM click track: BPM ±3, beats within 40 ms; **not yet tested on real music or in Premiere** |
 | Frame Export + Project Tidy (`ppro.exportFrame`, `ppro.tidyProject`/`untidyProject`) | QE exportFramePNG at playhead; root items → typed bins with undo | Mock-DOM tests pass; **unverified in Premiere** (QE exportFramePNG and moveBin behaviour) |
 | AE motion module (PR #2, AE thread): text animator presets (F-MG-04), shake (F-MG-08), counter (part of F-MG-06), 3D carousel (F-MG-05), layout utilities | `apps/panel/src/modules/ae-motion.ts`, `uet-ae-motion.jsx`, `uet-ae-layout.jsx`, `core/src/motion` | U/G tests pass (26 in `tests/ae-motion.test.ts`); **unverified in After Effects** (guide: `tests/host/AE_MOTION_TEST_TR.md`) |
+| Transition engine v1 (PR #3, transitions thread): 9 transitions (zoom in/out, whip ×4, spin, glitch, wave, light burst, flash, blur), F-TR-01 | AE: all 9 as tagged adjustment/solid layers, one undo group; Premiere: 6 of 9 as keyed effects on the two clips at the cut | U/G tests pass; **unverified in both apps** (guide `tests/host/TRANSITIONS_TEST_TR.md`; unknowns: AE effect match names, Premiere keyframe time base, non-English effect names) |
 | Dev build | `uet-panel-dev-0.1.6.zip` + `install-mac.sh` + Turkish test guide | Waiting for İso's Mac test |
 
 ## Blockers / waiting on İso
