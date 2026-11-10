@@ -58,8 +58,8 @@ export const CATALOG: CatalogItem[] = [
   P('look', 'luts', 'LUT', 'Sinematik renk görünümleri', 'soon', 'spark', { feature: 'F-VFX-01' }),
   P('look', 'glow', 'Glow', 'Eklentisiz parlama', 'soon', 'spark', { feature: 'F-VFX-02' }),
   P('look', 'shake', 'Sarsıntı ve Zoom', 'Kamera sarsıntısı, punch-in', 'soon', 'pop', { feature: 'F-MG-08' }),
-  P('tools', 'frame', 'Kare Dışa Aktar', 'Oynatma kafasındaki kareyi kaydet', 'soon', 'grid', { feature: 'F-PROD-06' }),
-  P('tools', 'tidy', 'Proje Düzeni', 'Projeyi türüne göre klasörle', 'soon', 'grid', { feature: 'F-PROD-02' }),
+  P('tools', 'frame', 'Kare Dışa Aktar', 'Oynatma kafasındaki kareyi PNG kaydet', 'beta', 'grid', { view: 'v-frame', keys: 'kare frame png ekran görüntüsü thumbnail', feature: 'F-PROD-06' }),
+  P('tools', 'tidy', 'Proje Düzeni', 'Projeyi türüne göre klasörle, geri alınabilir', 'beta', 'grid', { view: 'v-tidy', keys: 'düzen klasör bin tidy organize', feature: 'F-PROD-02' }),
   P('tools', 'safe', 'Güvenli Alan', 'Platform arayüz kılavuzları', 'soon', 'grid', { feature: 'F-FMT-04' }),
   P('tools', 'pdev', 'Bağlantı Testi', 'Premiere bağlantısı ve QE yoklaması', 'dev', 'dev', { view: 'v-pdev', keys: 'test ping' }),
   // ---------- After Effects ----------

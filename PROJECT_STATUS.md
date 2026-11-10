@@ -21,6 +21,7 @@ yet → every host feature below is UNVERIFIED.**
 | Panel UI shell v2 | Card catalog, categories, search, favourites (headless Chromium screenshots, no JS errors) | **unverified in Adobe (CEP Chromium 88 rendering)** |
 | Scene Detect (`video.detectScenes`, `ppro.detectScenes`) | ffmpeg scene score → markers or new sequence split at cuts | Synthetic 3-shot video test passes; **unverified in Premiere** |
 | Beat Markers (`audio.detectBeats`, `ppro.beatMarkers`) | Own onset/tempo tracker (no extra install) → BPM + markers every N beats | Synthetic 120 BPM click track: BPM ±3, beats within 40 ms; **not yet tested on real music or in Premiere** |
+| Frame Export + Project Tidy (`ppro.exportFrame`, `ppro.tidyProject`/`untidyProject`) | QE exportFramePNG at playhead; root items → typed bins with undo | Mock-DOM tests pass; **unverified in Premiere** (QE exportFramePNG and moveBin behaviour) |
 | Dev build | `uet-panel-dev-0.1.5.zip` + `install-mac.sh` + Turkish test guide | Waiting for İso's Mac test |
 
 ## Blockers / waiting on İso
