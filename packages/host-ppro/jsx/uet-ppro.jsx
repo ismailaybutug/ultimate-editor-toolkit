@@ -262,6 +262,72 @@ UET.ppro = (function () {
     } catch (e) { return fail(e); }
   }
 
+  function volumeLevel(clip) {
+    var comps = clip.components, i, j;
+    for (i = 0; i < comps.numItems; i++) {
+      var c = comps[i];
+      if (c.matchName === 'Internal Volume Stereo' || c.matchName === 'Internal Volume Mono' || c.displayName === 'Volume') {
+        for (j = 0; j < c.properties.numItems; j++) if (c.properties[j].displayName === 'Level') return c.properties[j];
+        // non-English Premiere: Level is the 2nd param (after Bypass)
+        if (c.properties.numItems > 1) return c.properties[1];
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Music ducking (F-AU-03). args: { trackIndex (audio track, 0-based), keys: [{t (timeline s), db}], undo?: [nodeIds] }
+   * Adds Volume Level keyframes to every clip on the track that overlaps the keys. Clips that already have
+   * volume keyframes are skipped (never overwrites the editor's work). Returns touched clip ids for unduck.
+   * Keyframe time base = source media time (timeline - clip.start + clip.inPoint). UNVERIFIED in Premiere.
+   */
+  function duckTrack(json) {
+    try {
+      var args = JSON.parse(json);
+      var seq = activeSeq();
+      if (args.trackIndex >= seq.audioTracks.numTracks) throw new Error('Audio track A' + (args.trackIndex + 1) + ' does not exist.');
+      var track = seq.audioTracks[args.trackIndex], touched = [], skipped = 0, nkeys = 0, i, k;
+      for (i = 0; i < track.clips.numItems; i++) {
+        var clip = track.clips[i];
+        var t0 = clip.start.seconds, t1 = clip.end.seconds, inP = clip.inPoint.seconds;
+        var inside = [];
+        for (k = 0; k < args.keys.length; k++) if (args.keys[k].t >= t0 && args.keys[k].t <= t1) inside.push(args.keys[k]);
+        if (!inside.length) continue;
+        var lvl = volumeLevel(clip);
+        if (!lvl) { skipped++; continue; }
+        if (lvl.isTimeVarying()) { skipped++; continue; }
+        var base = lvl.getValue();
+        lvl.setTimeVarying(true);
+        for (k = 0; k < inside.length; k++) {
+          var st = inside[k].t - t0 + inP;
+          lvl.addKey(st);
+          lvl.setValueAtKey(st, base * Math.pow(10, inside[k].db / 20), true);
+          nkeys++;
+        }
+        touched.push({ nodeId: clip.nodeId, base: base });
+      }
+      return ok({ clips: touched.length, keys: nkeys, skipped: skipped, touched: touched });
+    } catch (e) { return fail(e); }
+  }
+
+  /** Undo duckTrack: clear keyframes on the clips it touched and restore their level. */
+  function unduckTrack(json) {
+    try {
+      var args = JSON.parse(json);
+      var seq = activeSeq(), track = seq.audioTracks[args.trackIndex], n = 0, i, k;
+      for (i = 0; i < track.clips.numItems; i++) {
+        var clip = track.clips[i];
+        for (k = 0; k < args.touched.length; k++) {
+          if (args.touched[k].nodeId === clip.nodeId) {
+            var lvl = volumeLevel(clip);
+            if (lvl) { lvl.setTimeVarying(false); lvl.setValue(args.touched[k].base, true); n++; }
+          }
+        }
+      }
+      return ok({ restored: n });
+    } catch (e) { return fail(e); }
+  }
+
   /** Spike S2: report which QE DOM features exist on this Premiere build. Changes nothing. */
   function qeProbe() {
     try {
@@ -281,5 +347,5 @@ UET.ppro = (function () {
     } catch (e) { return fail(e); }
   }
 
-  return { ping: ping, getSelectedClipInfo: getSelectedClipInfo, addMarkers: addMarkers, buildFromRanges: buildFromRanges, importCaptions: importCaptions, exportFrame: exportFrame, tidyProject: tidyProject, untidyProject: untidyProject, qeProbe: qeProbe, TICKS: TICKS };
+  return { ping: ping, getSelectedClipInfo: getSelectedClipInfo, addMarkers: addMarkers, buildFromRanges: buildFromRanges, importCaptions: importCaptions, exportFrame: exportFrame, tidyProject: tidyProject, untidyProject: untidyProject, duckTrack: duckTrack, unduckTrack: unduckTrack, qeProbe: qeProbe, TICKS: TICKS };
 }());

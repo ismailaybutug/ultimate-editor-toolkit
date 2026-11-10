@@ -1,5 +1,5 @@
 // Panel UI for Premiere Pro and After Effects (CEP). Kept dependency-free for the Phase 2 spike.
-import { BUILTIN_RECIPES, retimeRecipe, buildRampKeyframes, segmentsFromCuts } from '@uet/core';
+import { BUILTIN_RECIPES, retimeRecipe, buildRampKeyframes, segmentsFromCuts, planDucking, invertRanges } from '@uet/core';
 import { z } from 'zod';
 import { CATALOG, CATEGORIES, STATUS_LABEL, type CatalogItem, type App } from './catalog';
 import { MODULES } from './modules/index';
@@ -330,6 +330,35 @@ async function untidyAction() {
   return r.data;
 }
 
+const DUCK_KEY = 'uet.duck.last';
+async function duckAction(p: { trackIndex: number; duckDb: number; fade: number }) {
+  if (!engine) throw new Error('Engine not running');
+  const info = await callHost<any>('ppro', 'getSelectedClipInfo');
+  if (!info.ok) throw new Error(info.error);
+  const d = info.data;
+  const a = await engine.call('audio.planSilenceCut', { file: d.mediaPath, minSilence: 0.4, padding: 0.05, fps: d.sequenceFps });
+  // speech = used part of the media minus silences, moved to timeline time
+  const off = d.timelineStart - d.sourceIn;
+  const speech = invertRanges(a.cut, a.duration)
+    .map((r: any) => ({ start: Math.max(r.start, d.sourceIn), end: Math.min(r.end, d.sourceOut) }))
+    .filter((r: any) => r.end > r.start)
+    .map((r: any) => ({ start: r.start + off, end: r.end + off }));
+  const keys = planDucking(speech, { duckDb: p.duckDb, attack: p.fade, release: p.fade * 1.6 });
+  const r = await callHost<any>('ppro', 'duckTrack', { trackIndex: p.trackIndex, keys });
+  if (!r.ok) throw new Error(r.error);
+  if (r.data.touched.length) localStorage.setItem(DUCK_KEY, JSON.stringify({ trackIndex: p.trackIndex, touched: r.data.touched }));
+  return { clip: d.name, speechParts: speech.length, ...r.data };
+}
+
+async function unduckAction() {
+  const last = JSON.parse(localStorage.getItem(DUCK_KEY) ?? 'null');
+  if (!last) throw new Error('Geri alınacak kısma yok.');
+  const r = await callHost<any>('ppro', 'unduckTrack', last);
+  if (!r.ok) throw new Error(r.error);
+  localStorage.removeItem(DUCK_KEY);
+  return r.data;
+}
+
 async function applyRecipeById(p: { recipeId: string; duration?: number; stagger: number }) {
   const base = BUILTIN_RECIPES.find(x => x.id === p.recipeId);
   if (!base) throw new Error(`Unknown recipe ${p.recipeId}`);
@@ -378,6 +407,18 @@ function registerHostTools(reg: any) {
       title: { en: 'Undo the last project tidy (items back to root, empty UET bins removed)', tr: 'Proje düzenini geri al' },
       params: z.object({}),
       run: untidyAction,
+    });
+    reg.register({
+      id: 'ppro.duckMusic', app: 'ppro', destructive: true,
+      title: { en: 'Lower music (an audio track) wherever the selected dialogue clip has speech, using volume keyframes; undo with ppro.unduckMusic', tr: 'Müzik kısma' },
+      params: z.object({ trackIndex: z.number().int().min(0).default(1).describe('0-based audio track index of the music (1 = A2)'), duckDb: z.number().min(-40).max(-1).default(-12), fade: z.number().min(0.05).max(2).default(0.3) }),
+      run: duckAction,
+    });
+    reg.register({
+      id: 'ppro.unduckMusic', app: 'ppro', destructive: true,
+      title: { en: 'Undo the last music ducking', tr: 'Müzik kısmayı geri al' },
+      params: z.object({}),
+      run: unduckAction,
     });
     reg.register({
       id: 'ppro.makeSubtitles', app: 'ppro', destructive: true,
@@ -448,6 +489,15 @@ function setupPremiere() {
   ub.disabled = !localStorage.getItem(TIDY_KEY);
   tb.onclick = busy(tb, async () => { const r = await tidyAction({ dryRun: false }); log(`${r.moved.length} öğe klasörlere taşındı → ${describeBins(r.bins)}`, 'ok'); ub.disabled = !r.moved.length; });
   ub.onclick = busy(ub, async () => { const r = await untidyAction(); log(`${r.restored} öğe eski yerine döndü.`, 'ok'); ub.disabled = true; });
+  const db = $<HTMLButtonElement>('duckBtn'), udb = $<HTMLButtonElement>('unduckBtn');
+  udb.disabled = !localStorage.getItem(DUCK_KEY);
+  db.onclick = busy(db, async () => {
+    log('Konuşma aranıyor, müzik kısılıyor...');
+    const r = await duckAction({ trackIndex: Number($<HTMLSelectElement>('duckTrack').value), duckDb: Number($<HTMLInputElement>('duckDb').value), fade: Number($<HTMLInputElement>('duckFade').value) });
+    log(`${r.speechParts} konuşma bölümü · ${r.clips} müzik klibine ${r.keys} anahtar kare eklendi${r.skipped ? ` · ${r.skipped} klip atlandı (zaten anahtar karesi var)` : ''}.`, r.clips ? 'ok' : 'err');
+    udb.disabled = !r.clips;
+  });
+  udb.onclick = busy(udb, async () => { const r = await unduckAction(); log(`${r.restored} klip eski haline döndü.`, 'ok'); udb.disabled = true; });
   const subs = $<HTMLButtonElement>('subs');
   subs.onclick = busy(subs, async () => {
     log('Konuşma yazıya dökülüyor (yerel, birkaç dakika sürebilir)...');

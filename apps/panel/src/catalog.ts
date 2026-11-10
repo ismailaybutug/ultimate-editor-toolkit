@@ -44,7 +44,7 @@ export const CATALOG: CatalogItem[] = [
   P('edit', 'reframe', 'Dikey Format', '9:16, 1:1, 4:5 için yeni sekans', 'soon', 'grid', { feature: 'F-FMT-03', keys: 'reels shorts tiktok' }),
   P('edit', 'podcast', 'Podcast Kurgusu', 'Konuşan kişiye otomatik geçiş', 'soon', 'grid', { feature: 'F-FMT-01' }),
   P('audio', 'loudness', 'Ses Seviyesi', 'LUFS ölç, platform hedefine göre kazanç', 'beta', 'meter', { view: 'v-loudness', keys: 'lufs loudness ses yüksekliği', feature: 'F-AU-04' }),
-  P('audio', 'ducking', 'Müzik Kısma', 'Konuşma varken müziği otomatik kıs', 'soon', 'meter', { feature: 'F-AU-03', keys: 'ducking' }),
+  P('audio', 'ducking', 'Müzik Kısma', 'Konuşma varken müziği otomatik kıs', 'beta', 'meter', { view: 'v-duck', feature: 'F-AU-03', keys: 'ducking müzik kıs konuşma' }),
   P('audio', 'beats', 'Vuruş Marker', 'BPM bul, müziğin ritmine marker koy', 'beta', 'wave', { view: 'v-beats', keys: 'beat bpm ritim müzik vuruş', feature: 'F-AU-05' }),
   P('audio', 'sfx', 'SFX Kütüphanesi', 'Whoosh, impact, riser', 'soon', 'wave', { feature: 'F-AU-07', keys: 'efekt sesi' }),
   P('audio', 'audiofx', 'Ses Efektleri', 'Telefon, radyo, su altı, megafon', 'soon', 'wave', { feature: 'F-AU-06' }),

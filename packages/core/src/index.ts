@@ -7,3 +7,4 @@ export * from './tool.js';
 export * from './recipes.js';
 export * from './transcript.js';
 export * from './rhythm.js';
+export * from './ducking.js';

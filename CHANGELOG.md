@@ -5,6 +5,7 @@
 - Added monorepo (pnpm, TypeScript, Vitest, esbuild), `@uet/core`, `@uet/engine`, AE and Premiere ExtendScript
   libraries, one CEP panel for both apps (Turkish UI), Mac installer and Turkish H-test guide.
 - Added MCP stdio server (`mcp.mjs`) so Claude Desktop can drive the panel tools (silence cut, AE recipes).
+- Added Music Ducking for Premiere (volume keyframes under speech, with undo).
 - Merged transition engine v1 (PR #3): 9 transitions for AE, 6 for Premiere.
 - Merged AE motion tools (PR #2): 12 text animations, shake, counter, 3D carousel, layout utilities.
 - Added Frame Export (PNG at playhead) and Project Tidy (bins by type, with undo) for Premiere.
