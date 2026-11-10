@@ -4,7 +4,7 @@ import { detectSilence, measureLoudness, loudnessGain, detectScenes, detectBeats
 import { findWhisper, findModel, modelDir } from './whisper.js';
 import { registerSubtitleTools } from './stt-tools.js';
 
-export const VERSION = '0.1.5';
+export const VERSION = '0.1.6';
 
 export function createRegistry(): ToolRegistry {
   const reg = new ToolRegistry();
