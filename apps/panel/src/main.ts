@@ -123,6 +123,29 @@ async function cutSilences(p: { minSilence: number; padding: number; thresholdDb
   return summary;
 }
 
+async function makeSubtitles(p: { language: string; maxChars: number; addToSequence: boolean }) {
+  if (!engine || !window.require) throw new Error('Engine not running');
+  const info = await callHost<any>('ppro', 'getSelectedClipInfo');
+  if (!info.ok) throw new Error(info.error);
+  const os = window.require('os'), path = window.require('path'), fs = window.require('fs');
+  const dir = path.join(os.homedir(), '.uet', 'subtitles');
+  fs.mkdirSync(dir, { recursive: true });
+  const safe = String(info.data.name).replace(/[^\w.-]+/g, '_').slice(0, 60);
+  const srtPath = path.join(dir, `${safe}-${Date.now()}.srt`);
+  const d = info.data;
+  const r = await engine.call('audio.transcribe', {
+    file: d.mediaPath, language: p.language, maxChars: p.maxChars, srtPath,
+    timeline: { sourceIn: d.sourceIn, sourceOut: d.sourceOut, timelineStart: d.timelineStart },
+  });
+  const out = { clip: d.name, language: r.language, model: r.model, captions: r.captions.length, srtPath, timing: r.timing, addedToSequence: false };
+  if (p.addToSequence) {
+    const h = await callHost<any>('ppro', 'importCaptions', { srtPath });
+    if (!h.ok) throw new Error(`SRT hazır (${srtPath}) ama sekansa eklenemedi: ${h.error}`);
+    out.addedToSequence = true;
+  }
+  return out;
+}
+
 async function applyRecipeById(p: { recipeId: string; duration?: number; stagger: number }) {
   const base = BUILTIN_RECIPES.find(x => x.id === p.recipeId);
   if (!base) throw new Error(`Unknown recipe ${p.recipeId}`);
@@ -140,6 +163,12 @@ function registerHostTools(reg: any) {
       title: { en: 'Find silences in the selected clip; optionally add markers or build a new cut sequence (original untouched)', tr: 'Sessizlikleri kes' },
       params: z.object({ mode: z.enum(['analyze', 'markers', 'newSequence']).default('analyze'), minSilence: z.number().min(0.1).default(0.5), padding: z.number().min(0).max(1).default(0.12), thresholdDb: z.number().max(0).optional() }),
       run: cutSilences,
+    });
+    reg.register({
+      id: 'ppro.makeSubtitles', app: 'ppro', destructive: true,
+      title: { en: 'Transcribe the selected clip locally (whisper.cpp), write an SRT and optionally add it as a caption track', tr: 'Altyazı oluştur' },
+      params: z.object({ language: z.string().default('auto'), maxChars: z.number().int().min(10).max(80).default(42), addToSequence: z.boolean().default(true) }),
+      run: makeSubtitles,
     });
   } else if (hostApp === 'AEFT') {
     reg.register({
@@ -177,6 +206,12 @@ function setupPremiere() {
     if (!info.ok) { report(info, () => ''); return; }
     const r = await engine.call('audio.measureLoudness', { file: info.data.mediaPath, targetLufs: Number($<HTMLSelectElement>('lufs').value) });
     log(`${info.data.name}: ${r.integratedLufs} LUFS, tepe ${r.truePeakDb} dBTP. Hedef için kazanç: ${r.gainDb > 0 ? '+' : ''}${r.gainDb} dB.`, 'ok');
+  });
+  const subs = $<HTMLButtonElement>('subs');
+  subs.onclick = busy(subs, async () => {
+    log('Konuşma yazıya dökülüyor (yerel, birkaç dakika sürebilir)...');
+    const r = await makeSubtitles({ language: $<HTMLSelectElement>('subLang').value, maxChars: Number($<HTMLInputElement>('subChars').value), addToSequence: $<HTMLInputElement>('subAdd').checked });
+    log(`${r.clip}: ${r.captions} altyazı satırı (dil ${r.language}, model ${r.model}, ${r.timing.elapsedSeconds} sn / ${r.timing.audioSeconds} sn ses). ${r.addedToSequence ? 'Sekansa eklendi.' : ''} SRT: ${r.srtPath}`, 'ok');
   });
   $('pping').onclick = async () => report(await callHost('ppro', 'ping'), d => `Premiere ${d.version} (build ${d.build}), sekans: ${d.sequence ?? 'yok'}`);
   $('qe').onclick = async () => report(await callHost('ppro', 'qeProbe'), d => `QE: ${JSON.stringify(d)}`);

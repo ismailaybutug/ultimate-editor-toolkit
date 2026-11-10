@@ -5,7 +5,8 @@
 - Added monorepo (pnpm, TypeScript, Vitest, esbuild), `@uet/core`, `@uet/engine`, AE and Premiere ExtendScript
   libraries, one CEP panel for both apps (Turkish UI), Mac installer and Turkish H-test guide.
 - Added MCP stdio server (`mcp.mjs`) so Claude Desktop can drive the panel tools (silence cut, AE recipes).
-- 29 automated tests pass; nothing tested in Adobe apps yet.
+- Added local transcription (whisper.cpp) with caption grouping, SRT export and a Premiere "Altyazı" tab that adds a caption track (unverified in Premiere).
+- 35 automated tests pass; nothing tested in Adobe apps yet.
 
 ## 2026-11-10
 - Created the project documentation set (Phase 0–1): PROJECT_MASTER, PROJECT_STATUS, MASTER_ROADMAP,

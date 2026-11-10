@@ -17,7 +17,8 @@ yet → every host feature below is UNVERIFIED.**
 | Premiere host lib `uet-ppro.jsx` | getSelectedClipInfo, addMarkers, buildFromRanges (non-destructive new sequence), qeProbe, ping | Mock-DOM tested; **unverified in Premiere** |
 | CEP panel | One panel for both apps, Turkish UI, engine runs inside the panel's Node | Loads in Chromium; **unverified in Adobe apps** |
 | MCP server `packages/mcp` | stdio MCP server forwarding to the Engine; Claude Desktop can call `ppro_cutSilences`, `ae_applyRecipe`, analysis tools | End-to-end tested with a scripted MCP client; **unverified with Claude Desktop + Adobe** |
-| Dev build | `uet-panel-dev-0.1.1.zip` + `install-mac.sh` + Turkish test guide | Waiting for İso's Mac test |
+| Local subtitles (`audio.transcribe`, `ppro.makeSubtitles`) | whisper.cpp CLI → words → captions → SRT → Premiere caption track | Parser/captions/SRT unit-tested; Engine pipeline tested with a fake `whisper-cli`; **real whisper.cpp + Premiere caption import unverified** (whisper binary could not be built in the cloud sandbox, HF model downloads blocked) |
+| Dev build | `uet-panel-dev-0.1.2.zip` + `install-mac.sh` + Turkish test guide | Waiting for İso's Mac test |
 
 ## Blockers / waiting on İso
 1. Run the Mac test (`tests/host/PHASE2_MAC_TEST_TR.md`) and send results + Premiere/AE versions.
@@ -25,7 +26,7 @@ yet → every host feature below is UNVERIFIED.**
 
 ## Next actions
 1. Record İso's H-test results; fix what fails.
-2. whisper.cpp transcription in the Engine + Apple Silicon benchmark, S3 Premiere UXP spike.
+2. Apple Silicon whisper benchmark (from İso's D1 result), S3 Premiere UXP spike.
 3. Then the Phase 2 checkpoint (MASTER_ROADMAP.md).
 
 ## Environment facts

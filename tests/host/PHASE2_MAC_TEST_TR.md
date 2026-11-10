@@ -57,3 +57,19 @@ Gerekenler: Mac'te Node.js (`node -v` 20 veya üstü; yoksa `brew install node`)
 | C1 | Claude `ppro_cutSilences` aracını çağırır ve kesim sayısını söyler |
 | C2 | "Marker olarak ekle" dersen sekansa marker'lar gelir |
 | C3 | After Effects'te bir katman seçip "pop-in animasyonu uygula" dersen animasyon uygulanır |
+
+## D. Altyazı (yerel, ücretsiz)
+Bir kerelik kurulum (Terminal):
+```
+brew install whisper-cpp
+mkdir -p ~/.uet/models
+curl -L -o ~/.uet/models/ggml-large-v3-turbo-q5_0.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin
+```
+(Model yaklaşık 550 MB.) Sonra Premiere'de konuşma içeren bir klip seç → panelde **Altyazı** sekmesi → Dil: Türkçe → **Altyazı oluştur**.
+
+| # | Beklenen | Bana yaz |
+|---|---|---|
+| D1 | Log satırı: kaç satır, kaç saniyede bitti (ör. "40 sn / 300 sn ses") | Log satırının aynısı |
+| D2 | Sekansta yeni bir altyazı izi, yazılar konuşmayla aynı anda | Zamanlama doğru mu, kayma var mı |
+| D3 | Türkçe karakterler (ç, ğ, ı, ö, ş, ü) doğru | Hatalı kelime örnekleri |
+| D4 | İz eklenemezse bile SRT dosyası ~/.uet/subtitles içinde | Hata mesajı |

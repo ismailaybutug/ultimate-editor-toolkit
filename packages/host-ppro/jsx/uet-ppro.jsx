@@ -3,7 +3,7 @@
  * Non-destructive by design: cuts build a NEW sequence; the original is never changed (TD-004).
  * STATUS: UNVERIFIED in Premiere Pro until TEST_REPORT.md says otherwise.
  */
-/* global app, qe, ProjectItemType */
+/* global app, qe, ProjectItemType, Sequence */
 var UET = UET || {};
 UET.ppro = (function () {
   var TICKS = 254016000000;
@@ -134,6 +134,31 @@ UET.ppro = (function () {
     }
   }
 
+  function findItemByPath(bin, path) {
+    var i, found = null;
+    for (i = 0; i < bin.children.numItems; i++) {
+      var it = bin.children[i];
+      if (it.type === ProjectItemType.BIN) { var f = findItemByPath(it, path); if (f) found = f; }
+      else { try { if (it.getMediaPath() === path) found = it; } catch (e1) { /* not media */ } }
+    }
+    return found;
+  }
+
+  /** Import an .srt and put it on a new caption track of the active sequence (times are already timeline times). */
+  function importCaptions(json) {
+    try {
+      var args = JSON.parse(json);
+      var seq = activeSeq();
+      if (typeof seq.createCaptionTrack !== 'function') throw new Error('This Premiere version cannot create caption tracks from scripts.');
+      app.project.importFiles([args.srtPath], true, app.project.rootItem, false);
+      var item = findItemByPath(app.project.rootItem, args.srtPath);
+      if (!item) throw new Error('Imported captions not found in the project.');
+      var fmt = (typeof Sequence !== 'undefined' && Sequence.CAPTION_FORMAT_SUBTITLE) ? Sequence.CAPTION_FORMAT_SUBTITLE : undefined;
+      var res = fmt === undefined ? seq.createCaptionTrack(item, 0) : seq.createCaptionTrack(item, 0, fmt);
+      return ok({ item: item.name, created: res !== false });
+    } catch (e) { return fail(e); }
+  }
+
   /** Spike S2: report which QE DOM features exist on this Premiere build. Changes nothing. */
   function qeProbe() {
     try {
@@ -153,5 +178,5 @@ UET.ppro = (function () {
     } catch (e) { return fail(e); }
   }
 
-  return { ping: ping, getSelectedClipInfo: getSelectedClipInfo, addMarkers: addMarkers, buildFromRanges: buildFromRanges, qeProbe: qeProbe, TICKS: TICKS };
+  return { ping: ping, getSelectedClipInfo: getSelectedClipInfo, addMarkers: addMarkers, buildFromRanges: buildFromRanges, importCaptions: importCaptions, qeProbe: qeProbe, TICKS: TICKS };
 }());

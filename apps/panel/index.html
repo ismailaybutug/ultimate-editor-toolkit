@@ -39,6 +39,13 @@
   <button class="btn secondary" id="markers" disabled>2a · Marker olarak işaretle</button>
   <button class="btn secondary" id="rebuild" disabled>2b · Kesilmiş yeni sekans oluştur</button>
 </section>
+<section data-app="PPRO" data-tab="Altyazı">
+  <p class="note">Seçili klibi Mac'inde yerel olarak yazıya döker (whisper.cpp, ücretsiz). SRT dosyası ~/.uet/subtitles klasörüne yazılır.</p>
+  <label>Dil <select id="subLang"><option value="auto">Otomatik</option><option value="tr">Türkçe</option><option value="en">İngilizce</option></select></label>
+  <label>Satır başına en fazla karakter <input id="subChars" type="number" step="1" value="42"></label>
+  <label><input id="subAdd" type="checkbox" checked> Altyazı izi olarak sekansa ekle</label>
+  <button class="btn" id="subs">Altyazı oluştur</button>
+</section>
 <section data-app="PPRO" data-tab="Ses">
   <p class="note">Seçili klibin ses yüksekliğini ölçer (EBU R128).</p>
   <label>Hedef <select id="lufs"><option value="-14">-14 LUFS (YouTube, Reels, TikTok)</option><option value="-16">-16 LUFS (podcast)</option><option value="-23">-23 LUFS (TV)</option></select></label>

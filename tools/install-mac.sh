@@ -19,7 +19,7 @@ echo "Kuruldu: $DEST"
 if command -v ffmpeg >/dev/null 2>&1 || [ -x /opt/homebrew/bin/ffmpeg ] || [ -x /usr/local/bin/ffmpeg ]; then
   echo "ffmpeg bulundu."
 else
-  echo "UYARI: ffmpeg yok. Ses analizi için gerekli. Kurmak için: brew install ffmpeg"
+  echo "UYARI: ffmpeg yok. Ses analizi için gerekli. Kurmak için: brew install ffmpeg whisper-cpp"
 fi
 echo "Claude Desktop için MCP sunucusu: $DEST/mcp.mjs (ayrıntı: PHASE2_MAC_TEST_TR.md bölüm C)"
 echo "Premiere Pro / After Effects'i yeniden başlat, sonra: Window > Extensions > Ultimate Editor Toolkit"

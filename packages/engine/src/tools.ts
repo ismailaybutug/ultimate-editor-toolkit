@@ -1,8 +1,10 @@
 import { z } from 'zod';
-import { ToolRegistry, planSilenceCut } from '@uet/core';
+import { writeFileSync } from 'node:fs';
+import { ToolRegistry, planSilenceCut, buildCaptions, toSrt, mapToTimeline } from '@uet/core';
 import { detectSilence, measureLoudness, loudnessGain } from './analysis.js';
+import { transcribe, findWhisper, findModel, modelDir } from './whisper.js';
 
-export const VERSION = '0.1.1';
+export const VERSION = '0.1.2';
 
 export function createRegistry(): ToolRegistry {
   const reg = new ToolRegistry();
@@ -38,6 +40,41 @@ export function createRegistry(): ToolRegistry {
       const m = await measureLoudness(p.file);
       return { ...m, targetLufs: p.targetLufs, gainDb: loudnessGain(m, p.targetLufs) };
     },
+  });
+  reg.register({
+    id: 'audio.transcribe', app: 'engine', destructive: false,
+    title: { en: 'Transcribe (local)', tr: 'Konuşmayı yazıya dök (yerel)' },
+    params: z.object({
+      file: z.string().min(1),
+      language: z.string().default('auto').describe('ISO code like tr or en, or auto'),
+      model: z.string().optional().describe('e.g. large-v3-turbo-q5_0, small, base'),
+      maxChars: z.number().int().min(10).max(80).default(42),
+      maxDuration: z.number().min(1).max(10).default(5),
+      srtPath: z.string().optional().describe('Write an .srt file here'),
+      includeWords: z.boolean().default(false),
+      timeline: z.object({ sourceIn: z.number(), sourceOut: z.number(), timelineStart: z.number() }).optional()
+        .describe('Keep only the used part of the media and move captions to timeline time'),
+    }),
+    run: async p => {
+      const t = await transcribe(p.file, { language: p.language, model: p.model });
+      const words = t.segments.flatMap(s => s.words);
+      let captions = buildCaptions(words, { maxChars: p.maxChars, maxDuration: p.maxDuration });
+      if (p.timeline) captions = mapToTimeline(captions, p.timeline);
+      const srt = toSrt(captions);
+      if (p.srtPath) writeFileSync(p.srtPath, srt, 'utf8');
+      return {
+        language: t.language, model: t.model, timing: t.timing, wordCount: words.length,
+        text: t.segments.map(s => s.text).join(' '),
+        captions: captions.map(c => ({ start: c.start, end: c.end, text: c.text, ...(p.includeWords ? { words: c.words } : {}) })),
+        srtPath: p.srtPath ?? null,
+      };
+    },
+  });
+  reg.register({
+    id: 'engine.status', app: 'engine', destructive: false,
+    title: { en: 'Engine status', tr: 'Motor durumu' },
+    params: z.object({}),
+    run: async () => ({ version: VERSION, whisper: findWhisper(), whisperModel: findModel(), modelDir: modelDir() }),
   });
   return reg;
 }

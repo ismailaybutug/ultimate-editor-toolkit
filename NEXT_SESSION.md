@@ -9,7 +9,7 @@ Talk to İso in **Turkish**, briefly. Write repo docs in English.
 4. If İso has sent results of `tests/host/PHASE2_MAC_TEST_TR.md`: record them in TEST_REPORT.md (with app
    versions), fix failures, rebuild the zip (`pnpm build`, then package `dist/com.uet.toolkit` + `tools/install-mac.sh`
    + the test guide as `uet-panel-dev-<version>.zip`), and ask İso to re-test only what changed.
-5. Otherwise continue Phase 2 in this order: whisper.cpp in Engine + benchmark on Apple Silicon → S3 Premiere UXP spike → Preset/StyleCard/Journal models →
+5. Otherwise continue Phase 2 in this order (whisper.cpp transcription code is done; benchmark comes from İso's D1 result): S3 Premiere UXP spike → Preset/StyleCard/Journal models →
    UI shell (command palette, review dialog) → GitHub Actions CI.
 6. Never mark a host feature done without an H result in TEST_REPORT.md.
 
