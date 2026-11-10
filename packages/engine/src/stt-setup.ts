@@ -103,7 +103,8 @@ async function installBinary(): Promise<void> {
   state = { ...state, phase: 'binary', receivedMb: 0, totalMb: 0, percent: 0 };
   const url = whisperBuildUrl();
   const got = await download(url, part, { gunzip: true, onProgress: (g, t) => { state.receivedMb = r1(g / MB); state.totalMb = r1(t / MB); state.percent = t ? Math.round((g / t) * 100) : 0; } });
-  let want = WHISPER_BUILD.sha256;
+  // A custom URL (tests, mirrors) brings its own hash in UET_WHISPER_SHA256.
+  let want = process.env.UET_WHISPER_URL ? (process.env.UET_WHISPER_SHA256 ?? '') : WHISPER_BUILD.sha256;
   if (!want && !process.env.UET_WHISPER_URL) {
     const sums = await fetchText(url.replace(/[^/]+$/, 'SHA256SUMS'));
     want = sums.split('\n').map(l => l.trim().split(/\s+/)).find(p => p[1] === WHISPER_BUILD.asset)?.[0] ?? '';

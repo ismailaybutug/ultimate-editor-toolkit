@@ -13,10 +13,6 @@ env:
   WHISPER_TAG: v1.8.7
   RELEASE_TAG: whisper-cli-v1.8.7-1
 jobs:
-  probe:
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "actions work"; uname -a
   build:
     runs-on: macos-latest
     steps:
@@ -49,3 +45,21 @@ jobs:
           gh release create "$RELEASE_TAG" whisper-cli-macos-arm64.gz SHA256SUMS -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --title "whisper-cli $WHISPER_TAG for Apple Silicon (UET)" --prerelease \
             --notes "whisper.cpp $WHISPER_TAG whisper-cli, arm64, Metal embedded, static, ad-hoc signed. Built by .github/workflows/whisper-macos.yml. Downloaded by the UET Engine (packages/engine/src/stt-setup.ts)."
+  e2e:
+    # Clean Mac, no Homebrew whisper: the Engine installs whisper-cli + model itself, then transcribes real speech.
+    needs: build
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: pnpm install --frozen-lockfile && pnpm build
+      - name: ffmpeg (İso's Mac has a static ffmpeg in ~/.local/bin; here any ffmpeg with libass)
+        run: command -v ffmpeg || brew install ffmpeg
+      - name: End-to-end transcription
+        run: |
+          export UET_HOME="$RUNNER_TEMP/uet"
+          export UET_FFMPEG="$(command -v ffmpeg)" UET_FFPROBE="$(command -v ffprobe)"
+          sysctl -n machdep.cpu.brand_string; sw_vers
+          node tests/stt-mac/e2e.cjs
