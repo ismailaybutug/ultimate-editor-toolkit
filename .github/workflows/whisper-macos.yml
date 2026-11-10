@@ -18,7 +18,7 @@ jobs:
     steps:
       - run: echo "actions work"; uname -a
   build:
-    runs-on: macos-14
+    runs-on: macos-latest
     steps:
       - name: Skip if the release already exists (assets are immutable once published)
         id: chk

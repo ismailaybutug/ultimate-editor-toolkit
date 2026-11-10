@@ -114,7 +114,8 @@ export interface AssOptions { width: number; height: number }
 
 /** ASS script that reproduces the style and animation. Times are as given (use timeline times for overlays). */
 export function toAss(captions: Caption[], style: CaptionStyle, o: AssOptions = { width: 1920, height: 1080 }): string {
-  const scale = o.height / 1080;
+  // Sizes are designed for the short side of a 1920x1080 frame, so vertical video gets the same text size.
+  const scale = Math.min(o.width, o.height) / 1080;
   const size = Math.round(style.size * scale);
   const outline = style.box ? Math.round(10 * scale) : Math.round(style.outlineWidth * scale);
   const posX = Math.round(style.x * o.width), posY = Math.round(style.y * o.height);
@@ -131,8 +132,9 @@ export function toAss(captions: Caption[], style: CaptionStyle, o: AssOptions = 
   ];
   const events: string[] = [];
   const ev = (start: number, end: number, text: string) => {
-    if (end - start >= 0.01) events.push(`Dialogue: 0,${assTime(start)},${assTime(end)},UET,,0,0,0,,{\\an2\\pos(${posX},${posY})}${text}`);
+    if (end - start >= 0.01) events.push(`Dialogue: 0,${assTime(start)},${assTime(end)},UET,,0,0,0,,{\\an2\\pos(${posX},${posY})${fsTag}}${text}`);
   };
+  let fsTag = '';
   for (const c of captions) {
     const words = c.words.length ? c.words : [{ text: c.text, start: c.start, end: c.end, p: 1 } as Word];
     const texts = words.map(w => assEscape(upper(w.text, style)));
@@ -140,6 +142,12 @@ export function toAss(captions: Caption[], style: CaptionStyle, o: AssOptions = 
     const lineEnds = new Set<number>(); // index of the last word of each line except the last
     counts.reduce((acc, n, li) => { if (li < counts.length - 1) lineEnds.add(acc + n - 1); return acc + n; }, 0);
     const join = (parts: string[]) => parts.map((p, k) => p + (k === parts.length - 1 ? '' : lineEnds.has(k) ? '\\N' : ' ')).join('');
+    // Shrink the font for this caption when its longest line would not fit in 90% of the frame width.
+    let longest = 0, cur = 0;
+    texts.forEach((t, k) => { cur += (cur ? 1 : 0) + t.length; if (lineEnds.has(k) || k === texts.length - 1) { longest = Math.max(longest, cur); cur = 0; } });
+    const charW = (style.uppercase || /black/i.test(style.font) ? 0.72 : 0.6) * (style.bold ? 1.05 : 1);
+    const fit = Math.floor((0.9 * o.width) / Math.max(1, longest * charW));
+    fsTag = fit < size ? `\\fs${fit}` : '';
     switch (style.animation) {
       case 'none': ev(c.start, c.end, join(texts)); break;
       case 'fade': ev(c.start, c.end, `{\\fad(120,120)}${join(texts)}`); break;
