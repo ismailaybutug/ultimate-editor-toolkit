@@ -37,6 +37,7 @@ export class LayerBase {
   threeDLayer = false;
   motionBlur = false;
   startTime = 0;
+  moveAfter(other: any) { (this as any).__movedAfter = other.name; }
   constructor(public name: string, public inPoint = 0, public outPoint = 5, public rect = { left: 0, top: 0, width: 200, height: 100 }) {
     const tg = this.root.add(new Node('ADBE Transform Group', 'Transform'));
     tg.add(new Node('ADBE Anchor Point', 'Anchor Point', [100, 50, 0]));
@@ -154,6 +155,39 @@ export class TextLayer extends LayerBase {
     }));
   }
 }
+const VECTOR_ITEMS: Record<string, () => Node> = {
+  'ADBE Vector Group': () => vectorGroup(),
+  'ADBE Vector Shape - Rect': () => leafGroup('ADBE Vector Shape - Rect', [['ADBE Vector Rect Size', [100, 100]], ['ADBE Vector Rect Position', [0, 0]], ['ADBE Vector Rect Roundness', 0]]),
+  'ADBE Vector Shape - Ellipse': () => leafGroup('ADBE Vector Shape - Ellipse', [['ADBE Vector Ellipse Size', [100, 100]], ['ADBE Vector Ellipse Position', [0, 0]]]),
+  'ADBE Vector Shape - Group': () => leafGroup('ADBE Vector Shape - Group', [['ADBE Vector Shape', { vertices: [], closed: true }]]),
+  'ADBE Vector Graphic - Fill': () => leafGroup('ADBE Vector Graphic - Fill', [['ADBE Vector Fill Color', [1, 0, 0, 1]], ['ADBE Vector Fill Opacity', 100]]),
+  'ADBE Vector Graphic - Stroke': () => leafGroup('ADBE Vector Graphic - Stroke', [['ADBE Vector Stroke Color', [1, 1, 1, 1]], ['ADBE Vector Stroke Width', 2], ['ADBE Vector Stroke Line Cap', 1], ['ADBE Vector Stroke Line Join', 1]]),
+  'ADBE Vector Filter - Trim': () => leafGroup('ADBE Vector Filter - Trim', [['ADBE Vector Trim Start', 0], ['ADBE Vector Trim End', 100], ['ADBE Vector Trim Offset', 0]]),
+};
+function leafGroup(m: string, props: Array<[string, any]>): Node {
+  const g = new Node(m, m.replace('ADBE Vector ', ''));
+  for (const [pm, v] of props) g.add(new Node(pm, pm, v));
+  return g;
+}
+const vectorFactory = (m: string) => { const f = VECTOR_ITEMS[m]; if (!f) throw new Error('mock: unsupported vector item ' + m); return f(); };
+function vectorGroup(): Node {
+  const g = new Node('ADBE Vector Group', 'Group 1');
+  g.add(new Node('ADBE Vectors Group', 'Contents', undefined, vectorFactory));
+  const tr = g.add(new Node('ADBE Vector Transform Group', 'Transform'));
+  tr.add(new Node('ADBE Vector Anchor', 'Anchor Point', [0, 0]));
+  tr.add(new Node('ADBE Vector Position', 'Position', [0, 0]));
+  tr.add(new Node('ADBE Vector Scale', 'Scale', [100, 100]));
+  return g;
+}
+export class ShapeLayer extends LayerBase {
+  constructor(name = 'Shape Layer 1') {
+    super(name, 0, 20);
+    this.node('ADBE Transform Group', 'ADBE Anchor Point').val = [0, 0, 0];
+    this.root.add(new Node('ADBE Root Vectors Group', 'Contents', undefined, vectorFactory));
+  }
+}
+export class Shape { vertices: number[][] = []; closed = true; }
+
 export class CameraLayer { name = 'Camera'; inPoint = 0; outPoint = 5; parent = null; property() { return null; } }
 
 export function makeComp(selected: any[]) {
@@ -163,20 +197,23 @@ export function makeComp(selected: any[]) {
     selectedLayers = selected;
     layers = {
       addText: (s: string) => { const l = new TextLayer('Text', 0, 20, s); all.unshift(l); return l; },
+      addShape: () => { const l = new ShapeLayer(); all.unshift(l); return l; },
       addNull: () => { const l = new AVLayer('Null 1', 0, 20, { left: 0, top: 0, width: 100, height: 100 }); l.node('ADBE Transform Group', 'ADBE Anchor Point').val = [50, 50, 0]; all.unshift(l); return l; },
     };
     all = all;
+    get numLayers() { return all.length; }
+    layer(i: number) { return all[i - 1]; }
   }
   return new CompItem();
 }
 
-export function loadAe(selected: any[], files = ['uet-ae.jsx', 'uet-ae-motion.jsx', 'uet-ae-layout.jsx']) {
+export function loadAe(selected: any[], files = ['uet-ae.jsx', 'uet-ae-motion.jsx', 'uet-ae-layout.jsx', 'uet-ae-gfx.jsx']) {
   const comp = makeComp(selected);
   const undo: string[] = [];
   const ctx: any = {
-    JSON, Math, String, Object, KeyframeEase, TextLayer, AVLayer, CompItem: comp.constructor,
+    JSON, Math, String, Object, KeyframeEase, Shape, TextLayer, AVLayer, CompItem: comp.constructor,
     KeyframeInterpolationType: KIT,
-    ParagraphJustification: { CENTER_JUSTIFY: 7415 },
+    ParagraphJustification: { CENTER_JUSTIFY: 7415, LEFT_JUSTIFY: 7413, RIGHT_JUSTIFY: 7414 },
     app: { version: '26.0', project: { activeItem: comp, file: null }, beginUndoGroup: (n: string) => undo.push('begin:' + n), endUndoGroup: () => undo.push('end') },
   };
   vm.createContext(ctx);
