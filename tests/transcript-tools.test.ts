@@ -146,3 +146,10 @@ describe('speech engine installer (local HTTP server)', () => {
   });
 });
 
+
+describe('ffmpeg capability check', () => {
+  it('detects libass the same way the overlay renderer does', async () => {
+    const { ffmpegHasLibass } = await import('../packages/engine/src/stt-tools');
+    expect(await ffmpegHasLibass()).toBe(hasLibass);
+  });
+});

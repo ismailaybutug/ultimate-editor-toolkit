@@ -37,8 +37,9 @@ async function captionsFor(p: { file: string; language: string; model?: string; 
 
 function ffmpegIn(cwd: string, args: string[]): Promise<{ code: number; stderr: string }> {
   return new Promise((resolve, reject) => {
-    const p = spawn(FFMPEG, args, { cwd, stdio: ['ignore', 'ignore', 'pipe'] });
+    const p = spawn(FFMPEG, args, { cwd, stdio: ['ignore', 'pipe', 'pipe'] });
     let err = '';
+    p.stdout.on('data', (d: Buffer) => { for (const m of d.toString().matchAll(/^\s*\S{2,3}\s+(\w+)\s+\S+->\S+/gm)) FILTERS_OUT.add(m[1]!); });
     p.stderr.on('data', d => { err = (err + d).slice(-8000); });
     p.on('error', reject);
     p.on('close', code => resolve({ code: code ?? -1, stderr: err }));
@@ -49,8 +50,20 @@ function ffmpegIn(cwd: string, args: string[]): Promise<{ code: number; stderr: 
  * Render captions into a transparent video (QuickTime Animation, or ProRes 4444) with ffmpeg + libass.
  * The clip covers [from, to) in the captions' time base.
  */
+let libass: boolean | null = null;
+/** Can this ffmpeg draw ASS subtitles (built with libass)? Cached. */
+export async function ffmpegHasLibass(): Promise<boolean> {
+  if (libass === null) {
+    const r = await ffmpegIn(tmpdir(), ['-hide_banner', '-filters']).catch(() => ({ code: -1, stderr: '' }));
+    libass = r.code === 0 ? FILTERS_OUT.has('ass') : false;
+  }
+  return libass;
+}
+const FILTERS_OUT = new Set<string>();
+
 export async function renderOverlay(captions: Caption[], styleId: string, o: { width: number; height: number; fps: number; from: number; to: number; out: string; codec: 'qtrle' | 'prores' }) {
   const style = getCaptionStyle(styleId);
+  if (!(await ffmpegHasLibass())) throw new Error('Bu ffmpeg sürümü stilli altyazı çizemiyor (libass yok). Altyazı izi (SRT) yine de çalışır.');
   const shifted = captions.map(c => ({ ...c, start: c.start - o.from, end: c.end - o.from, words: c.words.map(w => ({ ...w, start: w.start - o.from, end: w.end - o.from })) }));
   const dir = mkdtempSync(join(tmpdir(), 'uet-ovl-'));
   try {
