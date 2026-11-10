@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 
 import { existsSync } from 'node:fs';
+import { homedir } from 'node:os';
 
 // Adobe apps start panels with a minimal PATH, so look in the usual install places too.
 function findBinary(name: string, envVar: string): string {
@@ -8,7 +9,7 @@ function findBinary(name: string, envVar: string): string {
   if (fromEnv) return fromEnv;
   const candidates = process.platform === 'win32'
     ? [`C:\\ffmpeg\\bin\\${name}.exe`]
-    : [`/opt/homebrew/bin/${name}`, `/usr/local/bin/${name}`, `/usr/bin/${name}`];
+    : [`/opt/homebrew/bin/${name}`, `/usr/local/bin/${name}`, `${homedir()}/.local/bin/${name}`, `/usr/bin/${name}`];
   return candidates.find(c => existsSync(c)) ?? name;
 }
 

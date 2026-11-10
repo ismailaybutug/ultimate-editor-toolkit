@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Ultimate Editor Toolkit CEP panel (dev build). One panel for Premiere Pro (PPRO) and After Effects (AEFT). -->
-<ExtensionManifest Version="7.0" ExtensionBundleId="com.uet.toolkit" ExtensionBundleVersion="0.1.2" ExtensionBundleName="Ultimate Editor Toolkit"
+<ExtensionManifest Version="7.0" ExtensionBundleId="com.uet.toolkit" ExtensionBundleVersion="0.1.3" ExtensionBundleName="Ultimate Editor Toolkit"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <ExtensionList>
     <Extension Id="com.uet.toolkit.panel" Version="0.1.0" />

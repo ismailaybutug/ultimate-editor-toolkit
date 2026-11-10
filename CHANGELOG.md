@@ -5,6 +5,7 @@
 - Added monorepo (pnpm, TypeScript, Vitest, esbuild), `@uet/core`, `@uet/engine`, AE and Premiere ExtendScript
   libraries, one CEP panel for both apps (Turkish UI), Mac installer and Turkish H-test guide.
 - Added MCP stdio server (`mcp.mjs`) so Claude Desktop can drive the panel tools (silence cut, AE recipes).
+- Engine also looks for ffmpeg/whisper in ~/.local/bin (found on İso's Mac).
 - Added local transcription (whisper.cpp) with caption grouping, SRT export and a Premiere "Altyazı" tab that adds a caption track (unverified in Premiere).
 - 35 automated tests pass; nothing tested in Adobe apps yet.
 

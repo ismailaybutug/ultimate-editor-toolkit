@@ -16,7 +16,7 @@ cp -R "$SRC" "$DEST"
 xattr -dr com.apple.quarantine "$DEST" 2>/dev/null || true
 echo "Kuruldu: $DEST"
 
-if command -v ffmpeg >/dev/null 2>&1 || [ -x /opt/homebrew/bin/ffmpeg ] || [ -x /usr/local/bin/ffmpeg ]; then
+if command -v ffmpeg >/dev/null 2>&1 || [ -x /opt/homebrew/bin/ffmpeg ] || [ -x /usr/local/bin/ffmpeg ] || [ -x "$HOME/.local/bin/ffmpeg" ]; then
   echo "ffmpeg bulundu."
 else
   echo "UYARI: ffmpeg yok. Ses analizi için gerekli. Kurmak için: brew install ffmpeg whisper-cpp"

@@ -17,7 +17,7 @@ export function findWhisper(): string | null {
   const env = process.env.UET_WHISPER;
   if (env) return env;
   const names = ['whisper-cli', 'whisper-cpp'];
-  const dirs = ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin'];
+  const dirs = ['/opt/homebrew/bin', '/usr/local/bin', join(homedir(), '.local', 'bin'), '/usr/bin'];
   for (const d of dirs) for (const n of names) if (existsSync(`${d}/${n}`)) return `${d}/${n}`;
   return null;
 }
