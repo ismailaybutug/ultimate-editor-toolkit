@@ -22,8 +22,8 @@ const REPO = 'ismailaybutug/ultimate-editor-toolkit';
 export const WHISPER_BUILD = {
   tag: 'whisper-cli-v1.8.7-1',
   asset: 'whisper-cli-macos-arm64.gz',
-  /** SHA-256 of the gzip file. Empty = read SHA256SUMS from the same release (first build only). */
-  sha256: '',
+  /** SHA-256 of the gzip file (from the workflow log of the run that published the release). */
+  sha256: '27dccd422305532bd412d9800695728b044a4720d7a99018bc2c57d50c2d54c4',
 };
 export const whisperBuildUrl = () => process.env.UET_WHISPER_URL ?? `https://github.com/${REPO}/releases/download/${WHISPER_BUILD.tag}/${WHISPER_BUILD.asset}`;
 

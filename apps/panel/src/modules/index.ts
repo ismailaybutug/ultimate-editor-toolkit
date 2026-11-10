@@ -1,3 +1,4 @@
 import type { PanelModule } from './types';
+import { subtitlesModule } from './subtitles';
 // Each worker adds ONE import + ONE array entry here (the only shared line they touch).
-export const MODULES: PanelModule[] = [];
+export const MODULES: PanelModule[] = [subtitlesModule];
