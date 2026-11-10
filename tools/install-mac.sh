@@ -21,4 +21,5 @@ if command -v ffmpeg >/dev/null 2>&1 || [ -x /opt/homebrew/bin/ffmpeg ] || [ -x 
 else
   echo "UYARI: ffmpeg yok. Ses analizi için gerekli. Kurmak için: brew install ffmpeg"
 fi
+echo "Claude Desktop için MCP sunucusu: $DEST/mcp.mjs (ayrıntı: PHASE2_MAC_TEST_TR.md bölüm C)"
 echo "Premiere Pro / After Effects'i yeniden başlat, sonra: Window > Extensions > Ultimate Editor Toolkit"

@@ -4,7 +4,8 @@
 - İso approved Phase 0–1. Docs pushed to `main`.
 - Added monorepo (pnpm, TypeScript, Vitest, esbuild), `@uet/core`, `@uet/engine`, AE and Premiere ExtendScript
   libraries, one CEP panel for both apps (Turkish UI), Mac installer and Turkish H-test guide.
-- 28 automated tests pass; nothing tested in Adobe apps yet.
+- Added MCP stdio server (`mcp.mjs`) so Claude Desktop can drive the panel tools (silence cut, AE recipes).
+- 29 automated tests pass; nothing tested in Adobe apps yet.
 
 ## 2026-11-10
 - Created the project documentation set (Phase 0–1): PROJECT_MASTER, PROJECT_STATUS, MASTER_ROADMAP,

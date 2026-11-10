@@ -34,3 +34,26 @@ Ek: "Pop (in)", "Pulse (emphasis)", "Fade down (out)" animasyonlarını birkaç 
 - Her adım için: geçti / kaldı + log satırı veya ekran görüntüsü.
 - Premiere ve After Effects sürümleri (Help → About).
 - Özellikle B5: kesimler doğru yerde mi, ses kayması var mı?
+
+## C. Claude Desktop bağlantısı (MCP) — isteğe bağlı
+Gerekenler: Mac'te Node.js (`node -v` 20 veya üstü; yoksa `brew install node`) ve Claude Desktop.
+1. Claude Desktop → Settings → Developer → Edit Config. Açılan `claude_desktop_config.json` dosyasına ekle:
+```json
+{
+  "mcpServers": {
+    "ultimate-editor-toolkit": {
+      "command": "node",
+      "args": ["/Users/KULLANICI_ADIN/Library/Application Support/Adobe/CEP/extensions/com.uet.toolkit/mcp.mjs"]
+    }
+  }
+}
+```
+   (`KULLANICI_ADIN` yerine Mac kullanıcı adın; Terminal'de `whoami` yazınca görünür.) Node bulunamazsa `"command"` için `/opt/homebrew/bin/node` yaz.
+2. Claude Desktop'ı yeniden başlat. Premiere'de paneli aç ve bir klip seç.
+3. Claude Desktop'a yaz: "Ultimate Editor Toolkit ile seçili klipteki sessizlikleri analiz et."
+
+| # | Beklenen |
+|---|---|
+| C1 | Claude `ppro_cutSilences` aracını çağırır ve kesim sayısını söyler |
+| C2 | "Marker olarak ekle" dersen sekansa marker'lar gelir |
+| C3 | After Effects'te bir katman seçip "pop-in animasyonu uygula" dersen animasyon uygulanır |

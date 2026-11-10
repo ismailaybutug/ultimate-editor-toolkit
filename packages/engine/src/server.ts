@@ -4,6 +4,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { ToolRegistry } from '@uet/core';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 
 /**
  * JSON-RPC 2.0 over WebSocket on 127.0.0.1 (ARCHITECTURE.md §6).
@@ -23,7 +24,7 @@ export function startServer(reg: ToolRegistry, opts: { port?: number; token?: st
       const id = msg.id ?? null;
       try {
         if (msg.method === 'tools.list') {
-          const list = reg.list().map(t => ({ id: t.id, app: t.app, title: t.title, destructive: t.destructive }));
+          const list = reg.list().map(t => ({ id: t.id, app: t.app, title: t.title, destructive: t.destructive, inputSchema: zodToJsonSchema(t.params, { target: 'jsonSchema7', $refStrategy: 'none' }) }));
           ws.send(JSON.stringify({ jsonrpc: '2.0', id, result: list }));
           return;
         }

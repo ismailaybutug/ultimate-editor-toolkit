@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { ToolRegistry, planSilenceCut } from '@uet/core';
 import { detectSilence, measureLoudness, loudnessGain } from './analysis.js';
 
-export const VERSION = '0.1.0';
+export const VERSION = '0.1.1';
 
 export function createRegistry(): ToolRegistry {
   const reg = new ToolRegistry();

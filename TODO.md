@@ -17,7 +17,7 @@ Priority: P0 blocking · P1 next · P2 later. Owner role in brackets (see AGENT_
 - [~] P1 T2-S2 Premiere CEP spike — code done (razor/setSpeed only probed), waiting for H test: (markers, rebuild-from-ranges, QE razor, QE setSpeed on 26.5.x). [PR dev]
 - [ ] P1 T2-S3 Premiere UXP spike (same ops). [PR dev]
 - [~] P1 T2-S4 Engine spike — server + ffmpeg analysis done; whisper.cpp + Mac benchmark open: (launch, WS handshake, ffmpeg, whisper.cpp benchmark on Apple Silicon). [perf]
-- [ ] P1 T2-S5 MCP spike (Claude Desktop → Engine tool → timeline change). [AI eng]
+- [~] P1 T2-S5 MCP spike — server done + automated test; Claude Desktop H test (guide section C) pending.
 - [~] P1 T2-06 Monorepo scaffold done; GitHub Actions CI open. [architect]
 - [~] P1 T2-07 Core models: Recipe, Tool, ranges done; Preset, StyleCard, MotionSpec, Journal open. [architect]
 - [ ] P1 T2-08 UI shell (palette, tabs, themes, TR/EN, review dialog). [UI]

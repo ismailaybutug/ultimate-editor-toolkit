@@ -15,6 +15,8 @@ await build({ entryPoints: ['packages/engine/src/index.ts'], bundle: true, platf
 await build({ entryPoints: ['packages/engine/src/main.ts'], bundle: true, platform: 'node', format: 'esm', target: 'node20', outfile: 'dist/engine.mjs', alias, logLevel: 'warning',
   banner: { js: "import { createRequire } from 'module'; const require = createRequire(import.meta.url);" } });
 
+await build({ entryPoints: ['packages/mcp/src/main.ts'], bundle: true, platform: 'node', format: 'esm', target: 'node20', outfile: `${out}/mcp.mjs`, alias, logLevel: 'warning',
+  banner: { js: "import { createRequire } from 'module'; const require = createRequire(import.meta.url);" } });
 cpSync('apps/panel/index.html', `${out}/index.html`);
 cpSync('apps/panel/CSXS', `${out}/CSXS`, { recursive: true });
 cpSync('packages/host-ae/jsx/uet-ae.jsx', `${out}/jsx/uet-ae.jsx`);

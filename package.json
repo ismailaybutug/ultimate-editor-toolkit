@@ -1,7 +1,7 @@
 {
   "name": "ultimate-editor-toolkit",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "packageManager": "pnpm@10.28.0",
   "scripts": {
@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "ws": "^8.18.0",
-    "zod": "^3.24.0"
+    "zod": "^3.24.0",
+    "zod-to-json-schema": "^3.25.2"
   }
 }

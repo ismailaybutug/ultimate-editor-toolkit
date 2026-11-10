@@ -18,6 +18,7 @@ A feature is "verified" only with H results recorded here, including app version
 | `tests/engine.test.ts` (silence detection + loudness with real ffmpeg 7 on a synthetic 5.7 s file, JSON-RPC server, token rejection) | U | 4/4 pass |
 | `tests/host-ae-mock.test.ts` (real `uet-ae.jsx` on a mock AE DOM: all 5 recipes, values, undo grouping, errors, speed ramp) | G | 5/5 pass — found and fixed a real bug (array check that fails across script contexts) |
 | `tests/host-ppro-mock.test.ts` (real `uet-ppro.jsx` on a mock Premiere DOM: clip info, markers, rebuild from ranges) | G | 4/4 pass |
+| `tests/mcp.test.ts` (scripted MCP client → `mcp.mjs` → Engine: initialize, tools/list with JSON schemas, tools/call, validation error) | U | 1/1 pass |
 | ES3 syntax check of both `.jsx` files | G | pass |
 | Panel loads in headless Chromium, no JS errors | G | pass |
 | **Premiere Pro / After Effects** | H | **not run yet — everything above is unverified in the real apps** |

@@ -1,5 +1,6 @@
 // Panel UI for Premiere Pro and After Effects (CEP). Kept dependency-free for the Phase 2 spike.
 import { BUILTIN_RECIPES, retimeRecipe, buildRampKeyframes } from '@uet/core';
+import { z } from 'zod';
 
 declare global {
   interface Window {
@@ -59,6 +60,7 @@ async function startEngine() {
     if (!window.require) throw new Error('Node.js is not enabled in this panel');
     const mod = window.require(`${extensionPath()}/engine.cjs`);
     const reg = mod.createRegistry();
+    registerHostTools(reg);
     engine = { call: (id, p) => reg.call(id, p) };
     const info = await engine.call('engine.ping', {});
     try { await mod.startServer(reg, {}); } catch { /* another engine may already listen; direct calls still work */ }
@@ -99,23 +101,62 @@ function report(r: HostResult, okMsg: (d: any) => string) {
 
 // ---------- Premiere ----------
 let lastPlan: { keep: { start: number; end: number }[]; cut: { start: number; end: number }[] } | null = null;
+
+// ---------- Shared actions (used by buttons AND by MCP tools) ----------
+async function cutSilences(p: { minSilence: number; padding: number; thresholdDb?: number; mode: 'analyze' | 'markers' | 'newSequence' }) {
+  if (!engine) throw new Error('Engine not running');
+  const info = await callHost<any>('ppro', 'getSelectedClipInfo');
+  if (!info.ok) throw new Error(info.error);
+  const plan = await engine.call('audio.planSilenceCut', { file: info.data.mediaPath, minSilence: p.minSilence, padding: p.padding, thresholdDb: p.thresholdDb, fps: info.data.sequenceFps });
+  lastPlan = plan;
+  const summary = { clip: info.data.name, noiseFloorDb: plan.noiseFloorDb, thresholdDb: plan.thresholdDb, cuts: plan.cut.length, removedSeconds: plan.removedSeconds };
+  if (p.mode === 'markers') {
+    const r = await callHost<any>('ppro', 'addMarkers', { ranges: plan.cut, name: 'UET sessizlik', useSelection: true });
+    if (!r.ok) throw new Error(r.error);
+    return { ...summary, markers: r.data.markers };
+  }
+  if (p.mode === 'newSequence') {
+    const r = await callHost<any>('ppro', 'buildFromRanges', { keep: plan.keep });
+    if (!r.ok) throw new Error(r.error);
+    return { ...summary, newSequence: r.data.sequence, originalUnchanged: r.data.original };
+  }
+  return summary;
+}
+
+async function applyRecipeById(p: { recipeId: string; duration?: number; stagger: number }) {
+  const base = BUILTIN_RECIPES.find(x => x.id === p.recipeId);
+  if (!base) throw new Error(`Unknown recipe ${p.recipeId}`);
+  const recipe = retimeRecipe(base, p.duration ?? base.duration);
+  const r = await callHost<any>('ae', 'applyRecipe', { recipe, stagger: p.stagger });
+  if (!r.ok) throw new Error(r.error);
+  return r.data;
+}
+
+/** Tools that act on the open Adobe app. Registered into the in-panel Engine so MCP clients can use them. */
+function registerHostTools(reg: any) {
+  if (hostApp === 'PPRO') {
+    reg.register({
+      id: 'ppro.cutSilences', app: 'ppro', destructive: true,
+      title: { en: 'Find silences in the selected clip; optionally add markers or build a new cut sequence (original untouched)', tr: 'Sessizlikleri kes' },
+      params: z.object({ mode: z.enum(['analyze', 'markers', 'newSequence']).default('analyze'), minSilence: z.number().min(0.1).default(0.5), padding: z.number().min(0).max(1).default(0.12), thresholdDb: z.number().max(0).optional() }),
+      run: cutSilences,
+    });
+  } else if (hostApp === 'AEFT') {
+    reg.register({
+      id: 'ae.applyRecipe', app: 'ae', destructive: true,
+      title: { en: `Animate the selected layers. Recipes: ${BUILTIN_RECIPES.map(r => r.id).join(', ')}`, tr: 'Animasyon uygula' },
+      params: z.object({ recipeId: z.enum(BUILTIN_RECIPES.map(r => r.id) as [string, ...string[]]), duration: z.number().positive().optional(), stagger: z.number().min(0).default(0.08) }),
+      run: applyRecipeById,
+    });
+  }
+}
+
 function setupPremiere() {
   const analyze = $<HTMLButtonElement>('analyze');
   analyze.onclick = busy(analyze, async () => {
-    if (!engine) throw new Error('Motor çalışmıyor.');
-    const info = await callHost<any>('ppro', 'getSelectedClipInfo');
-    if (!info.ok) { report(info, () => ''); return; }
-    log(`Analiz ediliyor: ${info.data.name}`);
     const th = $<HTMLInputElement>('threshold').value;
-    const res = await engine.call('audio.planSilenceCut', {
-      file: info.data.mediaPath,
-      minSilence: Number($<HTMLInputElement>('minSilence').value),
-      padding: Number($<HTMLInputElement>('padding').value),
-      thresholdDb: th === '' ? undefined : Number(th),
-      fps: info.data.sequenceFps,
-    });
-    lastPlan = res;
-    log(`Gürültü tabanı ${res.noiseFloorDb} dB, eşik ${res.thresholdDb} dB. ${res.cut.length} kesim, ${res.removedSeconds} sn çıkarılacak.`, 'ok');
+    const r = await cutSilences({ mode: 'analyze', minSilence: Number($<HTMLInputElement>('minSilence').value), padding: Number($<HTMLInputElement>('padding').value), thresholdDb: th === '' ? undefined : Number(th) });
+    log(`${r.clip}: gürültü tabanı ${r.noiseFloorDb} dB, eşik ${r.thresholdDb} dB. ${r.cuts} kesim, ${r.removedSeconds} sn çıkarılacak.`, 'ok');
     $<HTMLButtonElement>('markers').disabled = false;
     $<HTMLButtonElement>('rebuild').disabled = false;
   });
