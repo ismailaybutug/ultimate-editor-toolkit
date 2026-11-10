@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Ultimate Editor Toolkit CEP panel (dev build). One panel for Premiere Pro (PPRO) and After Effects (AEFT). -->
+<ExtensionManifest Version="7.0" ExtensionBundleId="com.uet.toolkit" ExtensionBundleVersion="0.1.0" ExtensionBundleName="Ultimate Editor Toolkit"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <ExtensionList>
+    <Extension Id="com.uet.toolkit.panel" Version="0.1.0" />
+  </ExtensionList>
+  <ExecutionEnvironment>
+    <HostList>
+      <Host Name="PPRO" Version="[24.0,99.9]" />
+      <Host Name="AEFT" Version="[24.0,99.9]" />
+    </HostList>
+    <LocaleList><Locale Code="All" /></LocaleList>
+    <RequiredRuntimeList><RequiredRuntime Name="CSXS" Version="11.0" /></RequiredRuntimeList>
+  </ExecutionEnvironment>
+  <DispatchInfoList>
+    <Extension Id="com.uet.toolkit.panel">
+      <DispatchInfo>
+        <Resources>
+          <MainPath>./index.html</MainPath>
+          <CEFCommandLine>
+            <Parameter>--enable-nodejs</Parameter>
+            <Parameter>--mixed-context</Parameter>
+          </CEFCommandLine>
+        </Resources>
+        <Lifecycle><AutoVisible>true</AutoVisible></Lifecycle>
+        <UI>
+          <Type>Panel</Type>
+          <Menu>Ultimate Editor Toolkit</Menu>
+          <Geometry>
+            <Size><Height>620</Height><Width>380</Width></Size>
+            <MinSize><Height>300</Height><Width>280</Width></MinSize>
+          </Geometry>
+        </UI>
+      </DispatchInfo>
+    </Extension>
+  </DispatchInfoList>
+</ExtensionManifest>

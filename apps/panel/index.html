@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Ultimate Editor Toolkit</title>
+<style>
+  :root { --bg:#232323; --panel:#2c2c2c; --line:#3a3a3a; --text:#e6e6e6; --muted:#9a9a9a; --accent:#ff7a45; --ok:#5cc58a; --err:#ff6b6b; }
+  * { box-sizing: border-box; }
+  body { margin:0; font: 12px -apple-system, "Segoe UI", sans-serif; background:var(--bg); color:var(--text); }
+  header { display:flex; justify-content:space-between; align-items:center; padding:8px 10px; border-bottom:1px solid var(--line); }
+  header b { letter-spacing:.5px; }
+  #engine { color:var(--muted); font-size:11px; }
+  nav { display:flex; gap:2px; padding:6px 8px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  nav button { background:none; border:0; color:var(--muted); padding:5px 8px; border-radius:4px; cursor:pointer; }
+  nav button.on { background:var(--panel); color:var(--text); }
+  section { display:none; padding:10px; }
+  section.on { display:block; }
+  label { display:flex; justify-content:space-between; align-items:center; margin:6px 0; gap:8px; }
+  input, select { background:#1b1b1b; color:var(--text); border:1px solid var(--line); border-radius:4px; padding:4px 6px; width:120px; }
+  .btn { display:block; width:100%; margin-top:8px; padding:8px; background:var(--accent); color:#111; border:0; border-radius:5px; font-weight:600; cursor:pointer; }
+  .btn.secondary { background:var(--panel); color:var(--text); border:1px solid var(--line); }
+  .btn:disabled { opacity:.5; cursor:default; }
+  .note { color:var(--muted); font-size:11px; line-height:1.4; margin:6px 0; }
+  #log { margin:10px; padding:8px; background:#1b1b1b; border:1px solid var(--line); border-radius:4px; min-height:60px; max-height:180px; overflow:auto; white-space:pre-wrap; font: 11px Menlo, monospace; }
+  .okc { color:var(--ok); } .errc { color:var(--err); }
+</style>
+</head>
+<body>
+<header><b>ULTIMATE EDITOR TOOLKIT</b><span id="engine">motor: ...</span></header>
+<nav id="tabs"></nav>
+
+<!-- Premiere -->
+<section data-app="PPRO" data-tab="Sessizlik">
+  <p class="note">Zaman çizelgesinde bir klip seç. Analiz Mac'inde yerel olarak yapılır; orijinal sekans değişmez.</p>
+  <label>En kısa sessizlik (sn) <input id="minSilence" type="number" step="0.1" value="0.5"></label>
+  <label>Pay (sn) <input id="padding" type="number" step="0.02" value="0.12"></label>
+  <label>Eşik (dB, boş = otomatik) <input id="threshold" type="number" step="1" placeholder="otomatik"></label>
+  <button class="btn" id="analyze">1 · Sessizlikleri bul</button>
+  <button class="btn secondary" id="markers" disabled>2a · Marker olarak işaretle</button>
+  <button class="btn secondary" id="rebuild" disabled>2b · Kesilmiş yeni sekans oluştur</button>
+</section>
+<section data-app="PPRO" data-tab="Ses">
+  <p class="note">Seçili klibin ses yüksekliğini ölçer (EBU R128).</p>
+  <label>Hedef <select id="lufs"><option value="-14">-14 LUFS (YouTube, Reels, TikTok)</option><option value="-16">-16 LUFS (podcast)</option><option value="-23">-23 LUFS (TV)</option></select></label>
+  <button class="btn" id="loudness">Ölç</button>
+</section>
+<section data-app="PPRO" data-tab="Test">
+  <p class="note">Geliştirme testleri. Projede değişiklik yapmaz.</p>
+  <button class="btn secondary" id="pping">Premiere bağlantısını test et</button>
+  <button class="btn secondary" id="qe">QE özelliklerini yokla</button>
+</section>
+
+<!-- After Effects -->
+<section data-app="AEFT" data-tab="Animasyon">
+  <p class="note">Seçili katmanlara uygular. Tek Cmd+Z ile geri alınır.</p>
+  <label>Animasyon <select id="recipe"></select></label>
+  <label>Süre (sn) <input id="recipeDur" type="number" step="0.05" value="0.6"></label>
+  <label>Kademe (sn) <input id="stagger" type="number" step="0.02" value="0.08"></label>
+  <button class="btn" id="applyRecipe">Uygula</button>
+</section>
+<section data-app="AEFT" data-tab="Hız rampası">
+  <p class="note">Seçili video katmanında Time Remap anahtar kareleri oluşturur (elle düzenlenebilir).</p>
+  <label>Hedef hız (%) <input id="rampSpeed" type="number" value="300" min="10" max="400"></label>
+  <label>Rampa payı (%) <input id="rampFrac" type="number" value="30" min="5" max="50"></label>
+  <label>Şekil <select id="rampShape"><option value="both">giriş + çıkış</option><option value="in">sadece giriş</option><option value="out">sadece çıkış</option></select></label>
+  <label>Yumuşatma <select id="rampEase"><option>easeInOut</option><option>expoInOut</option><option>smooth</option><option>linear</option></select></label>
+  <button class="btn" id="applyRamp">Rampa uygula</button>
+</section>
+<section data-app="AEFT" data-tab="Test">
+  <button class="btn secondary" id="aping">After Effects bağlantısını test et</button>
+  <button class="btn secondary" id="testTitle">Test kompozisyonu + başlık oluştur</button>
+</section>
+
+<div id="log"></div>
+<script src="panel.js"></script>
+</body>
+</html>

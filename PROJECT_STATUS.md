@@ -3,31 +3,32 @@
 Last updated: 2026-11-10.
 
 ## Current stage
-**Phase 0 (Research & audit) and Phase 1 (Architecture) are drafted and waiting for İso's approval.**
-No product code exists yet. Nothing has been tested in Premiere Pro or After Effects for this project.
+**Phase 2 (Core foundation) in progress.** Phase 0–1 approved by İso on 2026-11-10 ("planı onaylıyorum").
+First working code is on branch `phase-2-foundation`. **Nothing has been tested in Premiere Pro or After Effects
+yet → every host feature below is UNVERIFIED.**
 
-## Completed (documentation only)
-- UmutcanFX feature inventory from the official page + public release list → FEATURE_INVENTORY.md (53 items).
-- Adobe integration research (UXP/CEP/ExtendScript status as of Nov 2026) → TECHNICAL_DECISIONS.md, ARCHITECTURE.md.
-- Existing prototype audit (Creative Universe / Motion Studio, from İso's Claude artifacts; source code not
-  available) → EXISTING_PROJECT_AUDIT.md. Verdict: design reuse, no code reuse.
-- Architecture, cost strategy, roadmap, handoff docs.
+## Built in Phase 2 so far (U/G-tested only, see TEST_REPORT.md)
+| Area | What exists | Status |
+|---|---|---|
+| Monorepo | pnpm + TypeScript, `pnpm check` (typecheck, ES3 check, tests, build) | Done |
+| `@uet/core` | time/ranges, silence cut planning (padding, min keep, protected words, frame snap), bezier easing + AE ease conversion, Recipe schema + 5 built-in recipes, speed-ramp curve → Time Remap keys, Tool registry | Unit-tested |
+| `@uet/engine` | ffmpeg wrapper with Mac path discovery, RMS silence detection with automatic noise floor, EBU R128 loudness + gain, JSON-RPC WebSocket server (token, discovery file `~/.uet/engine.json`) | Tested with real ffmpeg on Linux |
+| AE host lib `uet-ae.jsx` | applyRecipe (stagger, one undo group), speedRamp (Time Remap), createTestTitle, ping | Mock-DOM tested; **unverified in AE** |
+| Premiere host lib `uet-ppro.jsx` | getSelectedClipInfo, addMarkers, buildFromRanges (non-destructive new sequence), qeProbe, ping | Mock-DOM tested; **unverified in Premiere** |
+| CEP panel | One panel for both apps, Turkish UI, engine runs inside the panel's Node | Loads in Chromium; **unverified in Adobe apps** |
+| Dev build | `uet-panel-dev-0.1.0.zip` + `install-mac.sh` + Turkish test guide | Waiting for İso's Mac test |
 
-## Active work
-None. Waiting for approval.
+## Blockers / waiting on İso
+1. Run the Mac test (`tests/host/PHASE2_MAC_TEST_TR.md`) and send results + Premiere/AE versions.
+2. ffmpeg must be installed on the Mac (`brew install ffmpeg`) for audio analysis.
 
-## Blockers / decisions needed from İso
-1. Approve Phase 0–1 (architecture, Phase 2 scope) — required before implementation.
-2. After Effects version on the MacBook Air (Premiere 26.5.2 is known from the prototype test on 2026-10-29).
-3. GitHub push access: repo `ismailaybutug/ultimate-editor-toolkit` exists (empty) but the Claude session's GitHub
-   account (`iaybutug42-glitch`) could not push on 2026-11-10. Fix: add `iaybutug42-glitch` as a collaborator on
-   the repo, or reconnect GitHub in claude.ai with the `ismailaybutug` account. Until then the docs live in the
-   project Library folder `ultimate-editor-toolkit/`.
-
-## Next actions (after approval)
-Phase 2 week 1 spikes S1–S5 (MASTER_ROADMAP.md). See NEXT_SESSION.md.
+## Next actions
+1. Record İso's H-test results; fix what fails.
+2. S3 Premiere UXP spike, S5 MCP spike (Claude Desktop → Engine), whisper.cpp benchmark (S4 remainder).
+3. Then the Phase 2 checkpoint (MASTER_ROADMAP.md).
 
 ## Environment facts
-- İso's Mac: Apple Silicon MacBook Air; `/Applications/Adobe Premiere Pro 2026`; a local Premiere MCP bridge
-  (`~/.premiere-mcp-bridge`, CEP panel, ~283 tools incl. `execute_extendscript`) is installed and can drive host
-  tests when Premiere is open. Origin of that bridge: unknown (not ours).
+- İso's Mac: Apple Silicon MacBook Air; `/Applications/Adobe Premiere Pro 2026` (26.5.2 seen 2026-10-29); AE version unknown.
+- A local Premiere MCP bridge (`~/.premiere-mcp-bridge`, ~283 tools incl. `execute_extendscript`) is installed and
+  could automate Premiere checks when Premiere is open. Origin: not ours.
+- Repo: `ismailaybutug/ultimate-editor-toolkit` (push works since 2026-11-10).

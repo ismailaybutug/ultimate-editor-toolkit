@@ -33,7 +33,8 @@ Out of scope:
 ## Assignment log
 | Date | Task | Role | Status | Result |
 |---|---|---|---|---|
-| 2026-11-10 | Phase 0–1 research + docs | orchestrator | done, awaiting approval | 14 docs |
+| 2026-11-10 | Phase 0–1 research + docs | orchestrator | done, approved | 14 docs |
+| 2026-11-10 | Phase 2 first build (core, engine, AE/PPRO libs, panel) | orchestrator (sequential, no sub-agents) | code done, H tests pending | branch phase-2-foundation |
 
 ## Outstanding
 See TODO.md (Phase 2 spikes S1–S5 are the next assignments).
