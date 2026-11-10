@@ -60,6 +60,24 @@ UET.aeKit = (function () {
     }
     return idx.length;
   }
+  /** Like keys1D for non-spatial multi-dimensional values (e.g. shape group Scale [x, y]); one ease per dimension. */
+  function keysND(prop, keys) {
+    var i, d, idx = [];
+    for (i = 0; i < keys.length; i++) prop.setValueAtTime(keys[i].time, keys[i].value);
+    for (i = 0; i < keys.length; i++) idx.push(prop.nearestKeyIndex(keys[i].time));
+    for (i = 0; i < keys.length - 1; i++) {
+      var a = keys[i], b = keys[i + 1], bez = EASE[b.ease] || EASE.linear, outE = [], inE = [];
+      prop.setInterpolationTypeAtKey(idx[i], prop.keyInInterpolationType(idx[i]), KeyframeInterpolationType.BEZIER);
+      prop.setInterpolationTypeAtKey(idx[i + 1], KeyframeInterpolationType.BEZIER, prop.keyOutInterpolationType(idx[i + 1]));
+      for (d = 0; d < a.value.length; d++) {
+        var p = easePair(bez, a.value[d], b.value[d], b.time - a.time);
+        outE.push(p.out); inE.push(p.inn);
+      }
+      prop.setTemporalEaseAtKey(idx[i], prop.keyInTemporalEase(idx[i]), outE);
+      prop.setTemporalEaseAtKey(idx[i + 1], inE, prop.keyOutTemporalEase(idx[i + 1]));
+    }
+    return idx.length;
+  }
   function startsWith(s, pre) { return String(s).substr(0, pre.length) === pre; }
   function frame(comp) { return comp.frameDuration || 1 / 30; }
   /** Run fn inside one undo group named 'UET: name'. */
@@ -67,7 +85,7 @@ UET.aeKit = (function () {
     app.beginUndoGroup('UET: ' + name);
     try { return fn(); } finally { app.endUndoGroup(); }
   }
-  return { ok: ok, fail: fail, activeComp: activeComp, selected: selected, keys1D: keys1D, startsWith: startsWith, frame: frame, undo: undo };
+  return { ok: ok, fail: fail, activeComp: activeComp, selected: selected, keys1D: keys1D, keysND: keysND, startsWith: startsWith, frame: frame, undo: undo };
 }());
 
 (function (K, AE) {
@@ -131,6 +149,9 @@ UET.aeKit = (function () {
     for (i = 0; i < plan.keys.length; i++) keys.push({ time: t0 + plan.keys[i].t, value: plan.keys[i].v, ease: plan.keys[i].ease });
     K.keys1D(S().property(SEL_PROP[plan.animate]), keys);
   }
+
+  // shared with uet-ae-gfx.jsx (titles, callouts)
+  K.addTextAnimator = addAnimator;
 
   /**
    * args: {name, kind:'in'|'out', duration, props, plan (core planTextAnimator), atPlayhead, stagger, replace}

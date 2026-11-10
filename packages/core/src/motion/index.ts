@@ -3,3 +3,5 @@ export * from './textPresets.js';
 export * from './shake.js';
 export * from './carousel.js';
 export * from './counter.js';
+export * from './titles.js';
+export * from './callouts.js';

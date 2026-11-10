@@ -1,7 +1,7 @@
 /**
  * After Effects motion + typography module (owner: "Build After Effects animation tools" thread).
- * Text animation presets, shake, number counter, 3D carousel, anchor/align/distribute/sequence.
- * Host code: packages/host-ae/jsx/uet-ae-motion.jsx + uet-ae-layout.jsx. Logic: packages/core/src/motion.
+ * Text animation presets, shake, number counter, 3D carousel, anchor/align/distribute/sequence, titles, callouts.
+ * Host code: packages/host-ae/jsx/uet-ae-motion.jsx, uet-ae-layout.jsx, uet-ae-gfx.jsx. Logic: packages/core/src/motion.
  * Every tool is UNVERIFIED in After Effects until TEST_REPORT.md has an H result.
  */
 import { z } from 'zod';
@@ -12,12 +12,17 @@ import {
   SHAKE_PRESETS, ShakeSchema, shakeExpression, type ShakeParams,
   CounterSchema, counterExpression, formatCounter, type CounterParams,
   CarouselSchema, autoRadius, carouselSlots, spinKeys, type CarouselParams,
+  TitleSchema, layoutTitle, hexToAe, boxExpressions, type TitleParams,
+  CalloutSchema, calloutGeometry, followExpression, type CalloutParams,
 } from '../../../../packages/core/src/motion/index';
 
 const A = (cat: string, id: string, title: string, desc: string, preview: CatalogItem['preview'], extra: Partial<CatalogItem> = {}): CatalogItem =>
   ({ id, app: 'AEFT', cat, title, desc, status: 'beta', preview, ...extra });
 
 const opts = (pairs: Array<[string, string]>, sel?: string) => pairs.map(([v, l]) => `<option value="${v}"${v === sel ? ' selected' : ''}>${l}</option>`).join('');
+
+// shared CSS styles only number inputs and selects; give text inputs the same look without touching index.html
+const TXT = 'style="background:var(--bg2);color:var(--text);border:1px solid var(--line);border-radius:7px;padding:5px 7px;width:130px"';
 
 const VIEWS = `
   <section class="view" id="v-ae-text" data-app="AEFT">
@@ -52,8 +57,8 @@ const VIEWS = `
       <label>Bitiş <input id="aeCntTo" type="number" value="1000"></label>
       <label>Süre (sn) <input id="aeCntDur" type="number" step="0.1" value="2"></label>
       <label>Ondalık basamak <input id="aeCntDec" type="number" min="0" max="4" value="0"></label>
-      <label>Ön ek <input id="aeCntPre" type="text" value="" placeholder="₺"></label>
-      <label>Son ek <input id="aeCntSuf" type="text" value="" placeholder="%"></label>
+      <label>Ön ek <input id="aeCntPre" type="text" ${TXT} value="" placeholder="₺"></label>
+      <label>Son ek <input id="aeCntSuf" type="text" ${TXT} value="" placeholder="%"></label>
       <label>Biçim <select id="aeCntFmt">${opts([['tr', '1.234,5 (Türkçe)'], ['en', '1,234.5 (İngilizce)'], ['none', '1234.5']])}</select></label>
       <label>Hareket <select id="aeCntEase">${opts([['expoOut', 'Hızlı başla, yavaş bitir'], ['easeInOut', 'Yumuşak'], ['linear', 'Sabit hız']])}</select></label>
       <p class="note" id="aeCntPreview"></p>
@@ -71,6 +76,34 @@ const VIEWS = `
       <label>Her öğede bekleme (sn) <input id="aeCarHold" type="number" step="0.1" value="1"></label>
     </div>
     <button class="btn" id="aeCarApply">Karusel kur</button>
+  </section>
+  <section class="view" id="v-ae-titles" data-app="AEFT">
+    <div class="box2">
+      <p class="note">Oynatma kafasında düzenlenebilir bir başlık kurar. "/" ile alanları ayır: "Ayşe Yılmaz / Yönetmen". Yerleşim kompozisyonun yatay, dikey veya kare olmasına göre ayarlanır. Hepsini "(move me)" null'ı ile taşıyabilirsin.</p>
+      <label>Metin <input id="aeTitleText" type="text" ${TXT} value="Ayşe Yılmaz / Yönetmen"></label>
+      <label>Stil <select id="aeTitleStyle">${opts([['lowerThird', 'Alt bant (isim / unvan)'], ['headline', 'Manşet (ortada)'], ['kicker', 'Üst etiketli başlık'], ['boxed', 'Kutulu başlık']])}</select></label>
+      <label>Vurgu rengi <input id="aeTitleAccent" type="color" value="#ff5a36"></label>
+      <label>Yazı rengi <input id="aeTitleColor" type="color" value="#ffffff"></label>
+      <label>Ekranda kalma (sn) <input id="aeTitleDur" type="number" step="0.5" value="4"></label>
+      <label>Boyut <input id="aeTitleSize" type="number" step="0.1" value="1"></label>
+      <label>Giriş <select id="aeTitleIn">${opts(BUILTIN_TEXT_PRESETS.filter(p => p.kind === 'in').map(p => [p.id, p.tr]), 'word-rise')}</select></label>
+      <label>Çıkış <select id="aeTitleOut">${opts([['', 'Yok'], ...BUILTIN_TEXT_PRESETS.filter(p => p.kind === 'out').map(p => [p.id, p.tr] as [string, string])], 'char-sink-out')}</select></label>
+    </div>
+    <button class="btn" id="aeTitleApply">Başlık oluştur</button>
+  </section>
+  <section class="view" id="v-ae-callout" data-app="AEFT">
+    <div class="box2">
+      <p class="note">Bir katman seçersen işaretçi o katmana bağlanır ve onunla birlikte hareket eder. Seçim yoksa ekranın ortasına konur. Çizgi oynatma kafasında çizilmeye başlar.</p>
+      <label>Tür <select id="aeCoStyle">${opts([['pointer', 'Nokta + çizgi + etiket'], ['arrow', 'Ok']])}</select></label>
+      <label>Etiket <input id="aeCoLabel" type="text" ${TXT} value="Burası"></label>
+      <label>Yön <select id="aeCoDir">${opts([['ne', 'Sağ üst'], ['nw', 'Sol üst'], ['se', 'Sağ alt'], ['sw', 'Sol alt']])}</select></label>
+      <label>Uzunluk (px) <input id="aeCoLen" type="number" step="10" value="220"></label>
+      <label>Kalınlık (px) <input id="aeCoStroke" type="number" step="1" value="5"></label>
+      <label>Yazı boyutu <input id="aeCoFont" type="number" step="2" value="56"></label>
+      <label>Renk <input id="aeCoColor" type="color" value="#ffffff"></label>
+      <label>Katmanı takip et <input id="aeCoFollow" type="checkbox" checked></label>
+    </div>
+    <button class="btn" id="aeCoApply">Callout ekle</button>
   </section>
   <section class="view" id="v-ae-layout" data-app="AEFT">
     <div class="box2">
@@ -112,6 +145,38 @@ export function carouselArgs(widths: number[], c: CarouselParams) {
   return { radius, tilt: c.tilt, slots: carouselSlots(n, radius, c), spinKeys: spinKeys(n, c), spinEase: c.spin === 'continuous' ? 'linear' : 'easeInOut' };
 }
 
+const presetById = (id: string) => BUILTIN_TEXT_PRESETS.find(p => p.id === id);
+const animOf = (id: string) => { const p = presetById(id); if (!p) return null; const a = textAnimatorArgs(p); return { name: a.name, props: a.props, plan: a.plan, duration: a.duration }; };
+
+export function titleArgs(t: TitleParams, compW: number, compH: number, tag: string) {
+  const lay = layoutTitle(t, compW, compH, tag);
+  const elements = lay.elements.map(e => ({ ...e, color: hexToAe(e.color) }));
+  const box = lay.elements.find(e => e.kind === 'box');
+  return {
+    tag, aspect: lay.aspect, elements, duration: t.duration,
+    boxExpr: box && box.kind === 'box' ? boxExpressions(box.fitTo, box.padX, box.padY) : null,
+    animIn: animOf(t.animIn), animOut: animOf(t.animOut),
+  };
+}
+export function calloutArgs(c: CalloutParams, tag: string, followLayer: string | null) {
+  return {
+    tag, geometry: calloutGeometry(c), color: hexToAe(c.color), stroke: c.stroke, fontSize: c.fontSize, label: c.label, duration: c.duration,
+    followExpr: c.follow && followLayer ? followExpression(followLayer) : null, labelAnim: c.label ? animOf('char-rise') : null,
+  };
+}
+const newTag = () => Date.now().toString(36).slice(-4);
+
+async function runTitle(ctx: PanelContext, t: TitleParams) {
+  const comp = await must<any>(ctx.callHost('ae', 'compInfo'));
+  return must<any>(ctx.callHost('ae', 'createTitle', titleArgs(t, comp.width, comp.height, newTag())));
+}
+async function runCallout(ctx: PanelContext, c: CalloutParams) {
+  const comp = await must<any>(ctx.callHost('ae', 'compInfo'));
+  const sel: string[] = comp.selected;
+  if (sel.length > 1) throw new Error('İşaret edilecek tek bir katman seç (ya da hiç seçme).');
+  return must<any>(ctx.callHost('ae', 'createCallout', calloutArgs(c, newTag(), sel[0] ?? null)));
+}
+
 const FORMATS: Record<string, { thousands: string; decimal: string }> = { tr: { thousands: '.', decimal: ',' }, en: { thousands: ',', decimal: '.' }, none: { thousands: '', decimal: '.' } };
 
 async function must<T>(r: Promise<HostResult<T>>): Promise<T> {
@@ -135,10 +200,12 @@ export const aeMotionModule: PanelModule = {
     A('anim', 'shake', 'Sarsıntı', 'Darbe, el kamerası, deprem; ayarları sonradan değişir', 'pop', { view: 'v-ae-shake', feature: 'F-MG-08', keys: 'shake sarsıntı titreme wiggle darbe' }),
     A('anim', 'carousel', '3D Karusel', 'Katmanları halka, yay veya sarmal üzerinde döndür', 'grid', { view: 'v-ae-carousel', feature: 'F-MG-05', keys: '3d carousel karusel dönen' }),
     A('gfx', 'counter', 'Sayaç', 'Sayan rakam: para, yüzde, takipçi', 'meter', { view: 'v-ae-counter', feature: 'F-MG-06', keys: 'sayaç counter rakam sayı numara' }),
+    A('gfx', 'titles', 'Başlıklar', 'Alt bant, manşet, kutulu başlık; dikey/kare/yatay uyumlu', 'title', { view: 'v-ae-titles', feature: 'F-MG-01', keys: 'başlık title alt bant lower third isim unvan' }),
+    A('gfx', 'callouts', 'Callout ve Oklar', 'Katmanı takip eden işaretçi, ok ve etiket', 'pop', { view: 'v-ae-callout', feature: 'F-MG-06', keys: 'callout ok arrow işaret pointer etiket' }),
     A('tools', 'layout', 'Hizala ve Anchor', 'Anchor noktası, hizalama, eşit dağıtma, art arda dizme', 'grid', { view: 'v-ae-layout', keys: 'anchor hizala align distribute dağıt sırala sequence' }),
   ],
   viewsHtml: VIEWS,
-  jsx: ['jsx/uet-ae-motion.jsx', 'jsx/uet-ae-layout.jsx'],
+  jsx: ['jsx/uet-ae-motion.jsx', 'jsx/uet-ae-layout.jsx', 'jsx/uet-ae-gfx.jsx'],
 
   setup(ctx) {
     const { $, log, busy, callHost } = ctx;
@@ -198,6 +265,29 @@ export const aeMotionModule: PanelModule = {
       log(`Karusel kuruldu: ${d.layers.length} katman, "${d.null}" null'ı ile döner.`, 'ok');
     });
 
+    // Titles
+    const tiApply = $<HTMLButtonElement>('aeTitleApply');
+    tiApply.onclick = busy(tiApply, async () => {
+      const t = TitleSchema.parse({
+        text: $<HTMLInputElement>('aeTitleText').value, style: $<HTMLSelectElement>('aeTitleStyle').value,
+        accent: $<HTMLInputElement>('aeTitleAccent').value, textColor: $<HTMLInputElement>('aeTitleColor').value,
+        duration: num('aeTitleDur'), size: num('aeTitleSize'), animIn: $<HTMLSelectElement>('aeTitleIn').value, animOut: $<HTMLSelectElement>('aeTitleOut').value,
+      });
+      const d = await runTitle(ctx, t);
+      log(`Başlık oluşturuldu (${d.layers.length} katman, ${d.start.toFixed(1)}–${d.end.toFixed(1)} sn).${d.warnings?.length ? ' Uyarı: ' + d.warnings.join('; ') : ''}`, 'ok');
+    });
+
+    // Callouts
+    const coApply = $<HTMLButtonElement>('aeCoApply');
+    coApply.onclick = busy(coApply, async () => {
+      const c = CalloutSchema.parse({
+        style: $<HTMLSelectElement>('aeCoStyle').value, label: $<HTMLInputElement>('aeCoLabel').value, direction: $<HTMLSelectElement>('aeCoDir').value,
+        length: num('aeCoLen'), stroke: num('aeCoStroke'), fontSize: num('aeCoFont'), color: $<HTMLInputElement>('aeCoColor').value, follow: $<HTMLInputElement>('aeCoFollow').checked,
+      });
+      const d = await runCallout(ctx, c);
+      log(`Callout eklendi${d.target ? ` ("${d.target}" katmanına bağlı)` : ' (ekranın ortası)'}.`, 'ok');
+    });
+
     // Layout
     document.querySelectorAll<HTMLButtonElement>('#v-ae-layout [data-anchor]').forEach(b => {
       b.onclick = busy(b, async () => { const d = await must<any>(callHost('ae', 'setAnchor', { pos: b.dataset.anchor })); log(`Anchor taşındı: ${d.layers.join(', ') || '-'}.${skippedNote(d.skipped)}`, 'ok'); });
@@ -239,6 +329,18 @@ export const aeMotionModule: PanelModule = {
       title: { en: 'Arrange the selected layers (2+) as a spinning 3D carousel parented to a null', tr: '3D karusel' },
       params: CarouselSchema,
       run: async (p: any) => runCarousel(ctx, p),
+    });
+    reg.register({
+      id: 'ae.title', app: 'ae', destructive: true,
+      title: { en: 'Create an editable title at the playhead. "/" splits fields (name / role). Styles: lowerThird, headline, kicker, boxed. Layout adapts to landscape/vertical/square comps', tr: 'Başlık' },
+      params: TitleSchema,
+      run: async (p: any) => runTitle(ctx, p),
+    });
+    reg.register({
+      id: 'ae.callout', app: 'ae', destructive: true,
+      title: { en: 'Add a callout (pointer with label, or arrow) at the playhead, attached to the single selected layer or the comp centre', tr: 'Callout' },
+      params: CalloutSchema,
+      run: async (p: any) => runCallout(ctx, p),
     });
     reg.register({
       id: 'ae.layout', app: 'ae', destructive: true,

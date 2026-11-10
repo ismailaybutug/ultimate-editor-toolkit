@@ -34,4 +34,16 @@ Bir de dikdörtgen shape katmanı ekle.
 2. 3 katman seç: "Sol" (kompozisyona göre) → hepsi sol kenara yaslanmalı. "Seçime göre" + "Alt" dene.
 3. 3+ katman: "Yatay eşit dağıt". 3 katman: "Art arda diz" (ara 0) → zaman çizelgesinde uç uca dizilmeli.
 
+## F. Başlıklar (Grafik → Başlıklar)
+1. Oynatma kafasını 1. saniyeye al. "Ayşe Yılmaz / Yönetmen", "Alt bant" → Başlık oluştur.
+   Sol altta isim, altında unvan ve yanında renkli dikey çizgi çıkmalı; 4 sn sonra kaybolmalı.
+2. "Manşet", "Üst etiketli başlık" ve "Kutulu başlık"ı dene. Kutulu başlıkta metni Timeline'da değiştir: kutu yazıya göre büyüyüp küçülmeli.
+3. 1080x1920 (dikey) yeni bir kompozisyonda alt bant: yazı ekranın altındaki butonların üstünde kalmalı.
+4. "(move me)" null'ını taşı: başlık bütün olarak taşınmalı.
+
+## G. Callout ve Oklar
+1. Bir katman seç, "Nokta + çizgi + etiket" → Callout ekle. Nokta katmanın üstünde çıkmalı, çizgi çizilerek uzamalı, sonra etiket belirmeli.
+2. O katmanı hareket ettir (ya da konumuna animasyon ver): callout da onunla gitmeli.
+3. Hiçbir şey seçmeden "Ok" ve 4 farklı yönü dene: okun ucu ortaya bakmalı.
+
 Son olarak: After Effects sürümünü (Yardım → Hakkında) yaz.
