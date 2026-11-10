@@ -2,6 +2,8 @@
 import { BUILTIN_RECIPES, retimeRecipe, buildRampKeyframes, segmentsFromCuts } from '@uet/core';
 import { z } from 'zod';
 import { CATALOG, CATEGORIES, STATUS_LABEL, type CatalogItem, type App } from './catalog';
+import { MODULES } from './modules/index';
+import type { PanelContext } from './modules/types';
 
 declare global {
   interface Window {
@@ -160,7 +162,26 @@ function closeView() {
   $('chips').style.display = '';
 }
 
+function mergeModules() {
+  const main = $('main');
+  for (const m of MODULES) {
+    for (const it of m.catalog) {
+      const i = CATALOG.findIndex(x => x.app === it.app && x.id === it.id);
+      if (i >= 0) CATALOG[i] = it; else CATALOG.push(it);
+    }
+    if (m.viewsHtml) main.insertAdjacentHTML('beforeend', m.viewsHtml);
+  }
+}
+
+function moduleContext(): PanelContext {
+  return {
+    hostApp, callHost: callHost as any, engine: () => engine, log, busy: busy as any, $,
+    loadJsx: async (rel: string) => { await evalHost(`$.evalFile(${JSON.stringify(extensionPath() + '/' + rel)})`); },
+  };
+}
+
 function setupShell() {
+  mergeModules();
   const app = shellApp();
   $('hostName').textContent = app === 'AEFT' ? 'After Effects' : 'Premiere Pro';
   document.querySelectorAll<HTMLElement>('.view').forEach(v => { if (v.dataset.app !== app) v.remove(); });
@@ -289,6 +310,7 @@ async function applyRecipeById(p: { recipeId: string; duration?: number; stagger
 
 /** Tools that act on the open Adobe app. Registered into the in-panel Engine so MCP clients can use them. */
 function registerHostTools(reg: any) {
+  for (const m of MODULES) { try { m.registerTools?.(reg, moduleContext()); } catch (e) { log(`Modül ${m.id} araçları: ${(e as Error).message}`, 'err'); } }
   if (hostApp === 'PPRO') {
     reg.register({
       id: 'ppro.cutSilences', app: 'ppro', destructive: true,
@@ -415,6 +437,13 @@ async function init() {
   if (hostApp === 'BROWSER') { $('status').textContent = 'Tarayıcı önizlemesi: Adobe bağlantısı yok.'; return; }
   await loadHostLibrary();
   if (hostApp === 'PPRO') setupPremiere(); else setupAfterEffects();
+  const ctx = moduleContext();
+  for (const m of MODULES) {
+    try {
+      for (const j of m.jsx ?? []) await ctx.loadJsx(j);
+      await m.setup?.(ctx);
+    } catch (e) { log(`Modül ${m.id}: ${(e as Error).message}`, 'err'); }
+  }
   await startEngine();
 }
 init();

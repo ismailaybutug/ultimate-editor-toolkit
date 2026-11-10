@@ -1,6 +1,6 @@
 // Build the CEP extension folder: dist/com.uet.toolkit/
 import { build } from 'esbuild';
-import { cpSync, mkdirSync, rmSync } from 'node:fs';
+import { cpSync, mkdirSync, rmSync, readdirSync } from 'node:fs';
 
 const out = 'dist/com.uet.toolkit';
 rmSync(out, { recursive: true, force: true });
@@ -19,6 +19,8 @@ await build({ entryPoints: ['packages/mcp/src/main.ts'], bundle: true, platform:
   banner: { js: "import { createRequire } from 'module'; const require = createRequire(import.meta.url);" } });
 cpSync('apps/panel/index.html', `${out}/index.html`);
 cpSync('apps/panel/CSXS', `${out}/CSXS`, { recursive: true });
-cpSync('packages/host-ae/jsx/uet-ae.jsx', `${out}/jsx/uet-ae.jsx`);
-cpSync('packages/host-ppro/jsx/uet-ppro.jsx', `${out}/jsx/uet-ppro.jsx`);
+// Every .jsx in the host packages ships (module workers add their own uet-<module>.jsx files there).
+for (const d of ['packages/host-ae/jsx', 'packages/host-ppro/jsx']) {
+  for (const f of readdirSync(d).filter(f => f.endsWith('.jsx'))) cpSync(`${d}/${f}`, `${out}/jsx/${f}`);
+}
 console.log(`built ${out}`);
