@@ -1,10 +1,10 @@
 import { z } from 'zod';
 import { writeFileSync } from 'node:fs';
-import { ToolRegistry, planSilenceCut, buildCaptions, toSrt, mapToTimeline } from '@uet/core';
-import { detectSilence, measureLoudness, loudnessGain } from './analysis.js';
+import { ToolRegistry, planSilenceCut, buildCaptions, toSrt, mapToTimeline, everyNth } from '@uet/core';
+import { detectSilence, measureLoudness, loudnessGain, detectScenes, detectBeats } from './analysis.js';
 import { transcribe, findWhisper, findModel, modelDir } from './whisper.js';
 
-export const VERSION = '0.1.4';
+export const VERSION = '0.1.5';
 
 export function createRegistry(): ToolRegistry {
   const reg = new ToolRegistry();
@@ -68,6 +68,21 @@ export function createRegistry(): ToolRegistry {
         captions: captions.map(c => ({ start: c.start, end: c.end, text: c.text, ...(p.includeWords ? { words: c.words } : {}) })),
         srtPath: p.srtPath ?? null,
       };
+    },
+  });
+  reg.register({
+    id: 'video.detectScenes', app: 'engine', destructive: false,
+    title: { en: 'Find shot changes', tr: 'Sahne değişimlerini bul' },
+    params: z.object({ file: z.string().min(1), threshold: z.number().min(0.05).max(0.9).default(0.3), minGap: z.number().min(0).default(0.5) }),
+    run: async p => detectScenes(p.file, { threshold: p.threshold, minGap: p.minGap }),
+  });
+  reg.register({
+    id: 'audio.detectBeats', app: 'engine', destructive: false,
+    title: { en: 'Find music beats and BPM', tr: 'Vuruşları ve BPM bul' },
+    params: z.object({ file: z.string().min(1), every: z.number().int().min(1).max(16).default(1), offset: z.number().int().min(0).default(0) }),
+    run: async p => {
+      const r = await detectBeats(p.file);
+      return { ...r, beats: everyNth(r.beats, p.every, p.offset), totalBeats: r.beats.length };
     },
   });
   reg.register({

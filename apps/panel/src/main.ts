@@ -1,5 +1,5 @@
 // Panel UI for Premiere Pro and After Effects (CEP). Kept dependency-free for the Phase 2 spike.
-import { BUILTIN_RECIPES, retimeRecipe, buildRampKeyframes } from '@uet/core';
+import { BUILTIN_RECIPES, retimeRecipe, buildRampKeyframes, segmentsFromCuts } from '@uet/core';
 import { z } from 'zod';
 import { CATALOG, CATEGORIES, STATUS_LABEL, type CatalogItem, type App } from './catalog';
 
@@ -244,6 +244,40 @@ async function makeSubtitles(p: { language: string; maxChars: number; addToSeque
   return out;
 }
 
+async function detectScenesAction(p: { threshold: number; mode: 'analyze' | 'markers' | 'newSequence' }) {
+  if (!engine) throw new Error('Engine not running');
+  const info = await callHost<any>('ppro', 'getSelectedClipInfo');
+  if (!info.ok) throw new Error(info.error);
+  const d = info.data;
+  const r = await engine.call('video.detectScenes', { file: d.mediaPath, threshold: p.threshold });
+  const cuts: number[] = r.scenes.filter((t: number) => t > d.sourceIn && t < d.sourceOut);
+  const out: any = { clip: d.name, scenes: cuts.length };
+  if (p.mode === 'markers' && cuts.length) {
+    const m = await callHost<any>('ppro', 'addMarkers', { ranges: cuts.map(t => ({ start: t, end: t })), name: 'UET sahne', useSelection: true, colorIndex: 4 });
+    if (!m.ok) throw new Error(m.error);
+    out.markers = m.data.markers;
+  }
+  if (p.mode === 'newSequence' && cuts.length) {
+    const keep = segmentsFromCuts(cuts, d.sourceIn, d.sourceOut);
+    const b = await callHost<any>('ppro', 'buildFromRanges', { keep, name: `${d.sequence} - UET sahneler` });
+    if (!b.ok) throw new Error(b.error);
+    out.newSequence = b.data.sequence;
+  }
+  return out;
+}
+
+async function beatMarkersAction(p: { every: number }) {
+  if (!engine) throw new Error('Engine not running');
+  const info = await callHost<any>('ppro', 'getSelectedClipInfo');
+  if (!info.ok) throw new Error(info.error);
+  const d = info.data;
+  const r = await engine.call('audio.detectBeats', { file: d.mediaPath, every: p.every });
+  const beats: number[] = r.beats.filter((t: number) => t >= d.sourceIn && t < d.sourceOut);
+  const m = await callHost<any>('ppro', 'addMarkers', { ranges: beats.map(t => ({ start: t, end: t })), name: 'UET vuruş', useSelection: true, colorIndex: 2 });
+  if (!m.ok) throw new Error(m.error);
+  return { clip: d.name, bpm: r.bpm, confidence: r.confidence, markers: m.data.markers };
+}
+
 async function applyRecipeById(p: { recipeId: string; duration?: number; stagger: number }) {
   const base = BUILTIN_RECIPES.find(x => x.id === p.recipeId);
   if (!base) throw new Error(`Unknown recipe ${p.recipeId}`);
@@ -261,6 +295,18 @@ function registerHostTools(reg: any) {
       title: { en: 'Find silences in the selected clip; optionally add markers or build a new cut sequence (original untouched)', tr: 'Sessizlikleri kes' },
       params: z.object({ mode: z.enum(['analyze', 'markers', 'newSequence']).default('analyze'), minSilence: z.number().min(0.1).default(0.5), padding: z.number().min(0).max(1).default(0.12), thresholdDb: z.number().max(0).optional() }),
       run: cutSilences,
+    });
+    reg.register({
+      id: 'ppro.detectScenes', app: 'ppro', destructive: true,
+      title: { en: 'Find shot changes in the selected clip; add markers or build a new sequence split at each cut (original untouched)', tr: 'Sahne bulucu' },
+      params: z.object({ threshold: z.number().min(0.05).max(0.9).default(0.3), mode: z.enum(['analyze', 'markers', 'newSequence']).default('markers') }),
+      run: detectScenesAction,
+    });
+    reg.register({
+      id: 'ppro.beatMarkers', app: 'ppro', destructive: true,
+      title: { en: 'Detect tempo of the selected music clip and add sequence markers on beats', tr: 'Vuruş marker' },
+      params: z.object({ every: z.number().int().min(1).max(16).default(4) }),
+      run: beatMarkersAction,
     });
     reg.register({
       id: 'ppro.makeSubtitles', app: 'ppro', destructive: true,
@@ -304,6 +350,18 @@ function setupPremiere() {
     if (!info.ok) { report(info, () => ''); return; }
     const r = await engine.call('audio.measureLoudness', { file: info.data.mediaPath, targetLufs: Number($<HTMLSelectElement>('lufs').value) });
     log(`${info.data.name}: ${r.integratedLufs} LUFS, tepe ${r.truePeakDb} dBTP. Hedef için kazanç: ${r.gainDb > 0 ? '+' : ''}${r.gainDb} dB.`, 'ok');
+  });
+  const sc = $<HTMLButtonElement>('scenesBtn');
+  sc.onclick = busy(sc, async () => {
+    log('Sahneler aranıyor...');
+    const r = await detectScenesAction({ threshold: Number($<HTMLSelectElement>('sceneTh').value), mode: $<HTMLSelectElement>('sceneMode').value as any });
+    log(`${r.clip}: ${r.scenes} sahne değişimi bulundu.${r.markers ? ` ${r.markers} marker eklendi.` : ''}${r.newSequence ? ` Yeni sekans: "${r.newSequence}".` : ''}`, 'ok');
+  });
+  const bt = $<HTMLButtonElement>('beatsBtn');
+  bt.onclick = busy(bt, async () => {
+    log('Vuruşlar aranıyor...');
+    const r = await beatMarkersAction({ every: Number($<HTMLSelectElement>('beatEvery').value) });
+    log(`${r.clip}: ${r.bpm} BPM. ${r.markers} vuruş marker'ı eklendi.`, 'ok');
   });
   const subs = $<HTMLButtonElement>('subs');
   subs.onclick = busy(subs, async () => {

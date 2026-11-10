@@ -135,6 +135,21 @@
     <button class="btn secondary" id="markers" disabled>2a · Marker olarak işaretle</button>
     <button class="btn secondary" id="rebuild" disabled>2b · Kesilmiş yeni sekans oluştur</button>
   </section>
+  <section class="view" id="v-scenes" data-app="PPRO">
+    <div class="box2">
+      <p class="note">Seçili klipte çekim değişimlerini bulur. Orijinal sekans değişmez.</p>
+      <label>Hassasiyet <select id="sceneTh"><option value="0.2">Yüksek</option><option value="0.3" selected>Normal</option><option value="0.45">Düşük</option></select></label>
+      <label>Çıktı <select id="sceneMode"><option value="markers">Marker koy</option><option value="newSequence">Parçalara bölünmüş yeni sekans</option><option value="analyze">Sadece say</option></select></label>
+    </div>
+    <button class="btn" id="scenesBtn">Sahneleri bul</button>
+  </section>
+  <section class="view" id="v-beats" data-app="PPRO">
+    <div class="box2">
+      <p class="note">Seçili müzik klibinin temposunu bulur ve vuruşlara sekans marker'ı koyar.</p>
+      <label>Sıklık <select id="beatEvery"><option value="1">Her vuruş</option><option value="2">2 vuruşta bir</option><option value="4" selected>Her ölçü (4 vuruş)</option><option value="8">8 vuruşta bir</option></select></label>
+    </div>
+    <button class="btn" id="beatsBtn">Vuruşları bul ve işaretle</button>
+  </section>
   <section class="view" id="v-loudness" data-app="PPRO">
     <div class="box2">
       <p class="note">Seçili klibin ses yüksekliğini ölçer (EBU R128).</p>

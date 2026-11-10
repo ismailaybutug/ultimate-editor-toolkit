@@ -19,7 +19,9 @@ yet → every host feature below is UNVERIFIED.**
 | MCP server `packages/mcp` | stdio MCP server forwarding to the Engine; Claude Desktop can call `ppro_cutSilences`, `ae_applyRecipe`, analysis tools | End-to-end tested with a scripted MCP client; **unverified with Claude Desktop + Adobe** |
 | Local subtitles (`audio.transcribe`, `ppro.makeSubtitles`) | whisper.cpp CLI → words → captions → SRT → Premiere caption track | Parser/captions/SRT unit-tested; Engine pipeline tested with a fake `whisper-cli`; **real whisper.cpp + Premiere caption import unverified** (whisper binary could not be built in the cloud sandbox, HF model downloads blocked) |
 | Panel UI shell v2 | Card catalog, categories, search, favourites (headless Chromium screenshots, no JS errors) | **unverified in Adobe (CEP Chromium 88 rendering)** |
-| Dev build | `uet-panel-dev-0.1.4.zip` + `install-mac.sh` + Turkish test guide | Waiting for İso's Mac test |
+| Scene Detect (`video.detectScenes`, `ppro.detectScenes`) | ffmpeg scene score → markers or new sequence split at cuts | Synthetic 3-shot video test passes; **unverified in Premiere** |
+| Beat Markers (`audio.detectBeats`, `ppro.beatMarkers`) | Own onset/tempo tracker (no extra install) → BPM + markers every N beats | Synthetic 120 BPM click track: BPM ±3, beats within 40 ms; **not yet tested on real music or in Premiere** |
+| Dev build | `uet-panel-dev-0.1.5.zip` + `install-mac.sh` + Turkish test guide | Waiting for İso's Mac test |
 
 ## Blockers / waiting on İso
 1. Run the Mac test (`tests/host/PHASE2_MAC_TEST_TR.md`) and send results + Premiere/AE versions.

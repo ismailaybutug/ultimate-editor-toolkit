@@ -20,9 +20,11 @@ A feature is "verified" only with H results recorded here, including app version
 | `tests/host-ppro-mock.test.ts` (real `uet-ppro.jsx` on a mock Premiere DOM: clip info, markers, rebuild from ranges) | G | 4/4 pass |
 | `tests/mcp.test.ts` (scripted MCP client → `mcp.mjs` → Engine: initialize, tools/list with JSON schemas, tools/call, validation error) | U | 1/1 pass |
 | `tests/transcript.test.ts` (whisper `-ojf` JSON → words, captions, SRT, timeline mapping; Engine `audio.transcribe` with a fake `whisper-cli` test double; missing-model error) | U/G | 6/6 pass |
+| `tests/rhythm.test.ts` (showinfo parsing, segments, every-Nth; real ffmpeg: 120 BPM click track → BPM + beat accuracy; 3-shot synthetic video → 2 cuts) | U | 4/4 pass — first run found a 56 ms beat offset (analysis window latency), fixed |
 | ES3 syntax check of both `.jsx` files | G | pass |
 | Panel loads in headless Chromium, no JS errors | G | pass |
 | H-B1 Premiere 2026: panel 0.1.2 installs (Remote Control ran install-mac.sh with İso's approval), opens via Window > Extensions, and works (İso, 2026-11-10 11:45 UTC: "çalışıyor"; exact button tested not reported, assumed ping) | H | **pass (partial, İso's word only)** |
+| H-UI Premiere 2026: panel 0.1.4 (card UI v2) installed by İso via install-mac.sh, opens and renders (İso 2026-11-10 11:53 UTC: "çalışıyor") | H | **pass (İso's word)** |
 | All other Premiere / After Effects tests (silence, markers, rebuild, loudness, AE recipes, speed ramp, MCP, subtitles) | H | not run yet: unverified |
 
 ## Known bugs

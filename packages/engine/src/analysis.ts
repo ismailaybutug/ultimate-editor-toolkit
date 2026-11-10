@@ -1,4 +1,4 @@
-import type { Range } from '@uet/core';
+import { parseSceneTimes, onsetEnvelope, trackBeats, type Range, type BeatResult } from '@uet/core';
 import { decodePcm, probeDuration, run, FFMPEG } from './ffmpeg.js';
 
 export interface SilenceAnalysis {
@@ -83,3 +83,22 @@ export function loudnessGain(measured: { integratedLufs: number; truePeakDb: num
 
 const round1 = (x: number) => Math.round(x * 10) / 10;
 const round3 = (x: number) => Math.round(x * 1000) / 1000;
+
+/** Shot changes via ffmpeg scene score (FEATURE_INVENTORY F-PROD-04). Times are media (source) seconds. */
+export async function detectScenes(file: string, opts: { threshold?: number; minGap?: number } = {}): Promise<{ duration: number; threshold: number; scenes: number[] }> {
+  const threshold = opts.threshold ?? 0.3;
+  const [duration, r] = await Promise.all([
+    probeDuration(file),
+    run(FFMPEG, ['-hide_banner', '-nostats', '-i', file, '-an', '-sn', '-vf', `scale=320:-2,select='gt(scene,${threshold})',showinfo`, '-f', 'null', '-']),
+  ]);
+  if (r.code !== 0) throw new Error('scene detection failed: ' + r.stderr.slice(-300));
+  return { duration, threshold, scenes: parseSceneTimes(r.stderr, opts.minGap ?? 0.5) };
+}
+
+/** Beats + BPM of the audio (FEATURE_INVENTORY F-AU-05). */
+export async function detectBeats(file: string, opts: { minBpm?: number; maxBpm?: number } = {}): Promise<{ duration: number } & BeatResult> {
+  const sr = 16000;
+  const [duration, pcm] = await Promise.all([probeDuration(file), decodePcm(file, sr)]);
+  const { env, hopSec, offsetSec } = onsetEnvelope(pcm, sr, 256, 1024);
+  return { duration, ...trackBeats(env, hopSec, { ...opts, offsetSec }) };
+}
