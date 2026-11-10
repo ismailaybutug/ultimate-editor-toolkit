@@ -242,29 +242,6 @@ async function cutSilences(p: { minSilence: number; padding: number; thresholdDb
   return summary;
 }
 
-async function makeSubtitles(p: { language: string; maxChars: number; addToSequence: boolean }) {
-  if (!engine || !window.require) throw new Error('Engine not running');
-  const info = await callHost<any>('ppro', 'getSelectedClipInfo');
-  if (!info.ok) throw new Error(info.error);
-  const os = window.require('os'), path = window.require('path'), fs = window.require('fs');
-  const dir = path.join(os.homedir(), '.uet', 'subtitles');
-  fs.mkdirSync(dir, { recursive: true });
-  const safe = String(info.data.name).replace(/[^\w.-]+/g, '_').slice(0, 60);
-  const srtPath = path.join(dir, `${safe}-${Date.now()}.srt`);
-  const d = info.data;
-  const r = await engine.call('audio.transcribe', {
-    file: d.mediaPath, language: p.language, maxChars: p.maxChars, srtPath,
-    timeline: { sourceIn: d.sourceIn, sourceOut: d.sourceOut, timelineStart: d.timelineStart },
-  });
-  const out = { clip: d.name, language: r.language, model: r.model, captions: r.captions.length, srtPath, timing: r.timing, addedToSequence: false };
-  if (p.addToSequence) {
-    const h = await callHost<any>('ppro', 'importCaptions', { srtPath });
-    if (!h.ok) throw new Error(`SRT hazır (${srtPath}) ama sekansa eklenemedi: ${h.error}`);
-    out.addedToSequence = true;
-  }
-  return out;
-}
-
 async function detectScenesAction(p: { threshold: number; mode: 'analyze' | 'markers' | 'newSequence' }) {
   if (!engine) throw new Error('Engine not running');
   const info = await callHost<any>('ppro', 'getSelectedClipInfo');
@@ -420,12 +397,6 @@ function registerHostTools(reg: any) {
       params: z.object({}),
       run: unduckAction,
     });
-    reg.register({
-      id: 'ppro.makeSubtitles', app: 'ppro', destructive: true,
-      title: { en: 'Transcribe the selected clip locally (whisper.cpp), write an SRT and optionally add it as a caption track', tr: 'Altyazı oluştur' },
-      params: z.object({ language: z.string().default('auto'), maxChars: z.number().int().min(10).max(80).default(42), addToSequence: z.boolean().default(true) }),
-      run: makeSubtitles,
-    });
   } else if (hostApp === 'AEFT') {
     reg.register({
       id: 'ae.applyRecipe', app: 'ae', destructive: true,
@@ -498,12 +469,6 @@ function setupPremiere() {
     udb.disabled = !r.clips;
   });
   udb.onclick = busy(udb, async () => { const r = await unduckAction(); log(`${r.restored} klip eski haline döndü.`, 'ok'); udb.disabled = true; });
-  const subs = $<HTMLButtonElement>('subs');
-  subs.onclick = busy(subs, async () => {
-    log('Konuşma yazıya dökülüyor (yerel, birkaç dakika sürebilir)...');
-    const r = await makeSubtitles({ language: $<HTMLSelectElement>('subLang').value, maxChars: Number($<HTMLInputElement>('subChars').value), addToSequence: $<HTMLInputElement>('subAdd').checked });
-    log(`${r.clip}: ${r.captions} altyazı satırı (dil ${r.language}, model ${r.model}, ${r.timing.elapsedSeconds} sn / ${r.timing.audioSeconds} sn ses). ${r.addedToSequence ? 'Sekansa eklendi.' : ''} SRT: ${r.srtPath}`, 'ok');
-  });
   $('pping').onclick = async () => report(await callHost('ppro', 'ping'), d => `Premiere ${d.version} (build ${d.build}), sekans: ${d.sequence ?? 'yok'}`);
   $('qe').onclick = async () => report(await callHost('ppro', 'qeProbe'), d => `QE: ${JSON.stringify(d)}`);
 }

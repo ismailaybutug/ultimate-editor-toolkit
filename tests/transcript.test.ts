@@ -40,8 +40,9 @@ describe('audio.transcribe (engine, fake whisper-cli)', () => {
     }
     process.env.UET_WHISPER = resolve('tests/fixtures/fake-whisper-cli.mjs');
     process.env.UET_MODEL_DIR = dir;
+    process.env.UET_HOME = `${dir}/home`;
   });
-  afterAll(() => { delete process.env.UET_WHISPER; delete process.env.UET_MODEL_DIR; });
+  afterAll(() => { delete process.env.UET_WHISPER; delete process.env.UET_MODEL_DIR; delete process.env.UET_HOME; });
 
   it('runs the pipeline, returns captions and writes SRT', async () => {
     const reg = createRegistry();
@@ -56,7 +57,7 @@ describe('audio.transcribe (engine, fake whisper-cli)', () => {
   it('explains how to install whisper when the model is missing', async () => {
     rmSync(`${dir}/ggml-base.bin`);
     const reg = createRegistry();
-    await expect(reg.call('audio.transcribe', { file: `${dir}/clip.wav` })).rejects.toThrow(/brew install whisper-cpp/);
+    await expect(reg.call('audio.transcribe', { file: `${dir}/clip.wav` })).rejects.toThrow(/Motoru kur/);
   });
 });
 

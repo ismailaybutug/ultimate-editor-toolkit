@@ -5,6 +5,7 @@
 - Added monorepo (pnpm, TypeScript, Vitest, esbuild), `@uet/core`, `@uet/engine`, AE and Premiere ExtendScript
   libraries, one CEP panel for both apps (Turkish UI), Mac installer and Turkish H-test guide.
 - Added MCP stdio server (`mcp.mjs`) so Claude Desktop can drive the panel tools (silence cut, AE recipes).
+- Merged subtitle engine v2 (PR #4): one-click whisper install without Homebrew, caption styles, overlay video, filler word cleaner. Old built-in subtitle view removed (module replaces it).
 - Merged AE Titles and Callouts/Arrows (PR #5).
 - Added Music Ducking for Premiere (volume keyframes under speech, with undo).
 - Merged transition engine v1 (PR #3): 9 transitions for AE, 6 for Premiere.

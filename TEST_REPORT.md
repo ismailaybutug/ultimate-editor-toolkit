@@ -26,6 +26,7 @@ A feature is "verified" only with H results recorded here, including app version
 | `tests/transitions*.test.ts` (transition engine core + both host libs on mock DOMs; from PR #3) | U/G | pass (suite total 99) |
 | `tests/ducking.test.ts` (planDucking merge/ramps/monotonic keys, Premiere level units, duckTrack/unduckTrack on mock DOM) | U/G | 5/5 pass (suite total 104) |
 | AE titles/callouts tests (PR #5) | U/G | pass (suite total 117) |
+| Subtitle engine tests (PR #4: fillers, styles/exporters, installer vs local HTTP server, ffmpeg+libass overlay alpha) + macOS CI `e2e` (clean runner installs whisper via the Engine and transcribes Turkish `say` speech) | U/G + CI | pass (suite total 132) |
 | ES3 syntax check of both `.jsx` files | G | pass |
 | Panel loads in headless Chromium, no JS errors | G | pass |
 | H-B1 Premiere 2026: panel 0.1.2 installs (Remote Control ran install-mac.sh with İso's approval), opens via Window > Extensions, and works (İso, 2026-11-10 11:45 UTC: "çalışıyor"; exact button tested not reported, assumed ping) | H | **pass (partial, İso's word only)** |

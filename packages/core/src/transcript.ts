@@ -45,8 +45,12 @@ export function parseWhisperJson(json: WhisperJson): { language: string | null; 
   return { language: json.result?.language ?? null, segments };
 }
 
-export interface CaptionOptions { maxChars: number; maxDuration: number; maxGap: number; minDuration: number }
-export const DEFAULT_CAPTIONS: CaptionOptions = { maxChars: 42, maxDuration: 5, maxGap: 0.6, minDuration: 0.7 };
+export interface CaptionOptions {
+  maxChars: number; maxDuration: number; maxGap: number; minDuration: number;
+  /** Few-words-at-a-time captions (short-form video). 0 = no limit. */
+  maxWords: number;
+}
+export const DEFAULT_CAPTIONS: CaptionOptions = { maxChars: 42, maxDuration: 5, maxGap: 0.6, minDuration: 0.7, maxWords: 0 };
 
 /** Group words into caption lines: break on length, duration, pauses and sentence ends. */
 export function buildCaptions(words: Word[], opts: Partial<CaptionOptions> = {}): Caption[] {
@@ -62,7 +66,7 @@ export function buildCaptions(words: Word[], opts: Partial<CaptionOptions> = {})
     if (cur.length) {
       const first = cur[0]!, last = cur[cur.length - 1]!;
       const len = cur.map(x => x.text).join(' ').length + 1 + w.text.length;
-      if (len > o.maxChars || w.end - first.start > o.maxDuration || w.start - last.end > o.maxGap || /[.!?…]$/.test(last.text)) push();
+      if (len > o.maxChars || (o.maxWords > 0 && cur.length >= o.maxWords) || w.end - first.start > o.maxDuration || w.start - last.end > o.maxGap || /[.!?…]$/.test(last.text)) push();
     }
     cur.push(w);
   }
@@ -98,3 +102,6 @@ function srtTime(sec: number): string {
 export function toSrt(captions: Caption[]): string {
   return captions.map((c, i) => `${i + 1}\n${srtTime(c.start)} --> ${srtTime(c.end)}\n${c.text}\n`).join('\n');
 }
+
+export * from './transcript-fillers.js';
+export * from './transcript-styles.js';
