@@ -30,7 +30,7 @@ export const whisperBuildUrl = () => process.env.UET_WHISPER_URL ?? `https://git
 export interface ModelInfo { id: string; file: string; sizeMb: number; label: { tr: string; en: string }; sha256: string }
 /** sha256 '' = take it from Hugging Face's x-linked-etag header (the LFS object hash). */
 export const MODELS: ModelInfo[] = [
-  { id: 'large-v3-turbo-q5_0', file: 'ggml-large-v3-turbo-q5_0.bin', sizeMb: 547, label: { tr: 'En iyi (önerilen)', en: 'Best (recommended)' }, sha256: '' },
+  { id: 'large-v3-turbo-q5_0', file: 'ggml-large-v3-turbo-q5_0.bin', sizeMb: 547, label: { tr: 'En iyi (önerilen)', en: 'Best (recommended)' }, sha256: '394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2' },
   { id: 'small', file: 'ggml-small.bin', sizeMb: 466, label: { tr: 'Orta', en: 'Medium' }, sha256: '' },
   { id: 'base', file: 'ggml-base.bin', sizeMb: 142, label: { tr: 'Hızlı, daha az doğru', en: 'Fast, less accurate' }, sha256: '' },
 ];
