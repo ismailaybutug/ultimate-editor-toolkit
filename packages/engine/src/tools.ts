@@ -4,7 +4,7 @@ import { ToolRegistry, planSilenceCut, buildCaptions, toSrt, mapToTimeline } fro
 import { detectSilence, measureLoudness, loudnessGain } from './analysis.js';
 import { transcribe, findWhisper, findModel, modelDir } from './whisper.js';
 
-export const VERSION = '0.1.3';
+export const VERSION = '0.1.4';
 
 export function createRegistry(): ToolRegistry {
   const reg = new ToolRegistry();
