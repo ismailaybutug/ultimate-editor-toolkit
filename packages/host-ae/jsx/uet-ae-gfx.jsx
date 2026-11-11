@@ -97,7 +97,7 @@
     try {
       var c = K.activeComp(), sel = [], i, l = c.selectedLayers || [];
       for (i = 0; i < l.length; i++) sel.push(l[i].name);
-      return K.ok({ width: c.width, height: c.height, time: c.time, duration: c.duration, selected: sel });
+      return K.ok({ width: c.width, height: c.height, time: c.time, duration: c.duration, frameRate: c.frameRate, selected: sel });
     } catch (e) { return K.fail(e); }
   };
 

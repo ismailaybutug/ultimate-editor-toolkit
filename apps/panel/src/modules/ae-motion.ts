@@ -1,12 +1,14 @@
 /**
  * After Effects motion + typography module (owner: "Build After Effects animation tools" thread).
- * Text animation presets, shake, number counter, 3D carousel, anchor/align/distribute/sequence, titles, callouts.
- * Host code: packages/host-ae/jsx/uet-ae-motion.jsx, uet-ae-layout.jsx, uet-ae-gfx.jsx. Logic: packages/core/src/motion.
+ * Layer animations, text animation presets, shake, number counter, 3D carousel, anchor/align/distribute/sequence,
+ * titles, callouts, glow, animated backgrounds, map routes.
+ * Host code: packages/host-ae/jsx/uet-ae-motion.jsx, uet-ae-layout.jsx, uet-ae-gfx.jsx, uet-ae-fx.jsx. Logic: packages/core/src/motion.
  * Every tool is UNVERIFIED in After Effects until TEST_REPORT.md has an H result.
  */
 import { z } from 'zod';
 import type { PanelModule, PanelContext, HostResult } from './types';
 import type { CatalogItem } from '../catalog';
+import { retimeRecipe } from '../../../../packages/core/src/recipe';
 import {
   BUILTIN_TEXT_PRESETS, planTextAnimator, type TextPreset,
   SHAKE_PRESETS, ShakeSchema, shakeExpression, type ShakeParams,
@@ -14,6 +16,9 @@ import {
   CarouselSchema, autoRadius, carouselSlots, spinKeys, type CarouselParams,
   TitleSchema, layoutTitle, hexToAe, boxExpressions, type TitleParams,
   CalloutSchema, calloutGeometry, followExpression, type CalloutParams,
+  ALL_LAYER_RECIPES, GlowSchema, GLOW_PRESETS, glowPlan, type GlowParams,
+  BackgroundSchema, PALETTES, SIZES, planBackground, type BackgroundParams,
+  RouteSchema, routePath, travellerExpressions, type RouteParams,
 } from '../../../../packages/core/src/motion/index';
 
 const A = (cat: string, id: string, title: string, desc: string, preview: CatalogItem['preview'], extra: Partial<CatalogItem> = {}): CatalogItem =>
@@ -25,6 +30,53 @@ const opts = (pairs: Array<[string, string]>, sel?: string) => pairs.map(([v, l]
 const TXT = 'style="background:var(--bg2);color:var(--text);border:1px solid var(--line);border-radius:7px;padding:5px 7px;width:130px"';
 
 const VIEWS = `
+  <section class="view" id="v-ae-recipes" data-app="AEFT">
+    <div class="box2">
+      <p class="note">Seçili katmanlara uygular; değerler katmanın şu anki konumuna göre hesaplanır. Giriş katmanın başında, çıkış sonunda, vurgu oynatma kafasında başlar. Tek Cmd+Z ile geri alınır.</p>
+      <label>Tür <select id="aeRecKind">${opts([['in', 'Giriş'], ['emphasis', 'Vurgu'], ['out', 'Çıkış']])}</select></label>
+      <label>Animasyon <select id="aeRecId">${opts(ALL_LAYER_RECIPES.filter(r => r.kind === 'in').map(r => [r.id, r.tr]))}</select></label>
+      <label>Süre (sn) <input id="aeRecDur" type="number" step="0.05" value="${ALL_LAYER_RECIPES.find(r => r.kind === 'in')!.duration}"></label>
+      <label>Katmanlar arası kademe (sn) <input id="aeRecStagger" type="number" step="0.02" value="0.08"></label>
+    </div>
+    <button class="btn" id="aeRecApply">Uygula</button>
+  </section>
+  <section class="view" id="v-ae-glow" data-app="AEFT">
+    <div class="box2">
+      <p class="note">After Effects'in kendi Glow efektini ayarlı katmanlar halinde ekler (eklenti gerekmez). Effect Controls'ta "UET Glow" adıyla düzenlenir; tekrar uygulamak eskisinin yerine geçer.</p>
+      <label>Stil <select id="aeGlowPreset">${opts(Object.entries(GLOW_PRESETS).map(([k, v]) => [k, v.tr]))}</select></label>
+      <label>Boyut <input id="aeGlowSize" type="number" step="0.1" value="1"></label>
+      <label>Güç <input id="aeGlowStrength" type="number" step="0.1" value="1"></label>
+      <label>Neon rengi <input id="aeGlowColor" type="color" value="#38bdf8"></label>
+    </div>
+    <button class="btn" id="aeGlowApply">Glow ekle</button>
+    <button class="btn secondary" id="aeGlowRemove">Glow'u kaldır</button>
+  </section>
+  <section class="view" id="v-ae-bg" data-app="AEFT">
+    <div class="box2">
+      <p class="note">Kusursuz döngü yapan hareketli bir arka plan kompozisyonu kurar. Açık bir kompozisyon varsa en alta eklenir ve tüm süre boyunca döner.</p>
+      <label>Tür <select id="aeBgType">${opts([['mesh', 'Akan renk geçişi'], ['blobs', 'Yüzen ışık topları']])}</select></label>
+      <label>Renkler <select id="aeBgPalette">${opts(Object.entries(PALETTES).map(([k, v]) => [k, v.tr]), 'aurora')}</select></label>
+      <label>Boyut <select id="aeBgSize">${opts([['match', 'Açık kompozisyonla aynı'], ...Object.entries(SIZES).map(([k, v]) => [k, v.tr] as [string, string])])}</select></label>
+      <label>Döngü süresi (sn) <input id="aeBgLoop" type="number" step="1" value="10"></label>
+      <label>Hareket miktarı (0–1) <input id="aeBgMotion" type="number" step="0.1" value="0.5"></label>
+      <label>Film greni <input id="aeBgGrain" type="checkbox" checked></label>
+      <label>Açık kompozisyona ekle <input id="aeBgPlace" type="checkbox" checked></label>
+    </div>
+    <button class="btn" id="aeBgApply">Arka plan oluştur</button>
+  </section>
+  <section class="view" id="v-ae-route" data-app="AEFT">
+    <div class="box2">
+      <p class="note">Harita görselini kompozisyona koy, şehirlerin üstüne null ya da işaret katmanları yerleştir. Bu katmanları rota sırasıyla seç. Rota oynatma kafasında çizilmeye başlar; işaret çizgiyi takip eder.</p>
+      <label>Kavis (0–0.6) <input id="aeRtCurve" type="number" step="0.05" value="0.25"></label>
+      <label>Çizim süresi (sn) <input id="aeRtDur" type="number" step="0.1" value="3"></label>
+      <label>Renk <input id="aeRtColor" type="color" value="#ffd166"></label>
+      <label>Kalınlık (px) <input id="aeRtStroke" type="number" step="1" value="6"></label>
+      <label>Kesikli çizgi <input id="aeRtDash" type="checkbox" checked></label>
+      <label>Şehir noktaları <input id="aeRtPins" type="checkbox" checked></label>
+      <label>Hareket eden ok <input id="aeRtTrav" type="checkbox" checked></label>
+    </div>
+    <button class="btn" id="aeRtApply">Rotayı çiz</button>
+  </section>
   <section class="view" id="v-ae-text" data-app="AEFT">
     <div class="box2">
       <p class="note">Seçili metin katmanlarına AE'nin kendi Text Animator'ını ekler; sonra Timeline'da düzenleyebilirsin. Tek Cmd+Z ile geri alınır.</p>
@@ -177,6 +229,50 @@ async function runCallout(ctx: PanelContext, c: CalloutParams) {
   return must<any>(ctx.callHost('ae', 'createCallout', calloutArgs(c, newTag(), sel[0] ?? null)));
 }
 
+export function glowArgs(g: GlowParams, compHeight: number) {
+  const plan = glowPlan(g, compHeight);
+  const a = hexToAe(g.color);
+  return { ...plan, colorA: a, colorB: a.map(v => Math.round((v + (1 - v) * 0.7) * 1000) / 1000) };
+}
+export function backgroundArgs(b: BackgroundParams, active: { width: number; height: number; frameRate?: number } | null, tag: string) {
+  const plan = planBackground(b, active?.width, active?.height);
+  return {
+    name: `UET BG ${b.palette} ${plan.width}x${plan.height} ${tag}`, type: b.type, width: plan.width, height: plan.height, loop: plan.loop,
+    fps: active?.frameRate ?? 30, base: hexToAe(plan.base), points: plan.points.map(p => ({ color: hexToAe(p.color), expr: p.expr })),
+    grain: plan.grain, blurRadius: plan.blurRadius, placeInActive: !!active,
+  };
+}
+export function routeArgs(r: RouteParams, points: Array<{ x: number; y: number }>, tag: string) {
+  const path = routePath(points.map(p => [p.x, p.y] as [number, number]), r.curve);
+  return {
+    tag, path, color: hexToAe(r.color), stroke: r.stroke, dashed: r.dashed, duration: r.duration, pins: r.pins,
+    traveller: r.traveller ? travellerExpressions(`UET Route ${tag}`) : null,
+  };
+}
+async function activeComp(ctx: PanelContext): Promise<any | null> {
+  const r = await ctx.callHost<any>('ae', 'compInfo');
+  return r.ok ? r.data : null;
+}
+async function runRecipe(ctx: PanelContext, id: string, duration: number | undefined, stagger: number) {
+  const base = ALL_LAYER_RECIPES.find(r => r.id === id);
+  if (!base) throw new Error('Bilinmeyen animasyon: ' + id);
+  const recipe = duration && duration > 0 ? retimeRecipe(base, duration) : base;
+  const { tr: _tr, ...plain } = recipe as typeof base;
+  return must<any>(ctx.callHost('ae', 'applyRecipe', { recipe: plain, stagger }));
+}
+async function runGlow(ctx: PanelContext, g: GlowParams) {
+  const c = await activeComp(ctx);
+  if (!c) throw new Error('Önce bir kompozisyon aç.');
+  return must<any>(ctx.callHost('ae', 'applyGlow', glowArgs(g, c.height)));
+}
+async function runBackground(ctx: PanelContext, b: BackgroundParams) {
+  return must<any>(ctx.callHost('ae', 'createBackground', backgroundArgs(b, await activeComp(ctx), newTag())));
+}
+async function runRoute(ctx: PanelContext, r: RouteParams) {
+  const w = await must<any>(ctx.callHost('ae', 'waypoints'));
+  return must<any>(ctx.callHost('ae', 'createRoute', routeArgs(r, w.points, newTag())));
+}
+
 const FORMATS: Record<string, { thousands: string; decimal: string }> = { tr: { thousands: '.', decimal: ',' }, en: { thousands: ',', decimal: '.' }, none: { thousands: '', decimal: '.' } };
 
 async function must<T>(r: Promise<HostResult<T>>): Promise<T> {
@@ -196,20 +292,63 @@ async function runCarousel(ctx: PanelContext, c: CarouselParams) {
 export const aeMotionModule: PanelModule = {
   id: 'ae-motion',
   catalog: [
+    A('anim', 'recipes', 'Katman Animasyonu', `${ALL_LAYER_RECIPES.length} giriş, vurgu ve çıkış hareketi, tek Cmd+Z`, 'pop', { view: 'v-ae-recipes', feature: 'F-MG-03', keys: 'animasyon pop fade slide zıpla salla giriş çıkış' }),
     A('anim', 'textanim', 'Metin Animasyonu', `${BUILTIN_TEXT_PRESETS.length} hazır animasyon, AE Text Animator ile düzenlenebilir`, 'title', { view: 'v-ae-text', feature: 'F-MG-04', keys: 'metin yazı text harf kelime daktilo typewriter' }),
     A('anim', 'shake', 'Sarsıntı', 'Darbe, el kamerası, deprem; ayarları sonradan değişir', 'pop', { view: 'v-ae-shake', feature: 'F-MG-08', keys: 'shake sarsıntı titreme wiggle darbe' }),
     A('anim', 'carousel', '3D Karusel', 'Katmanları halka, yay veya sarmal üzerinde döndür', 'grid', { view: 'v-ae-carousel', feature: 'F-MG-05', keys: '3d carousel karusel dönen' }),
     A('gfx', 'counter', 'Sayaç', 'Sayan rakam: para, yüzde, takipçi', 'meter', { view: 'v-ae-counter', feature: 'F-MG-06', keys: 'sayaç counter rakam sayı numara' }),
     A('gfx', 'titles', 'Başlıklar', 'Alt bant, manşet, kutulu başlık; dikey/kare/yatay uyumlu', 'title', { view: 'v-ae-titles', feature: 'F-MG-01', keys: 'başlık title alt bant lower third isim unvan' }),
     A('gfx', 'callouts', 'Callout ve Oklar', 'Katmanı takip eden işaretçi, ok ve etiket', 'pop', { view: 'v-ae-callout', feature: 'F-MG-06', keys: 'callout ok arrow işaret pointer etiket' }),
+    A('gfx', 'glow', 'Glow', 'Eklentisiz parlama: yumuşak, neon, derin, bloom', 'spark', { view: 'v-ae-glow', feature: 'F-VFX-02', keys: 'glow parlama ışık neon bloom' }),
+    A('gfx', 'backgrounds', 'Arka Planlar', 'Döngülü hareketli arka plan, 8 renk paleti, her boyut', 'spark', { view: 'v-ae-bg', feature: 'F-MG-07', keys: 'arka plan background gradient döngü loop' }),
+    A('gfx', 'maps', 'Harita Rotası', 'Haritanda seçtiğin noktalar arasında çizilen rota', 'spark', { view: 'v-ae-route', keys: 'harita map rota route şehir uçak' }),
     A('tools', 'layout', 'Hizala ve Anchor', 'Anchor noktası, hizalama, eşit dağıtma, art arda dizme', 'grid', { view: 'v-ae-layout', keys: 'anchor hizala align distribute dağıt sırala sequence' }),
   ],
   viewsHtml: VIEWS,
-  jsx: ['jsx/uet-ae-motion.jsx', 'jsx/uet-ae-layout.jsx', 'jsx/uet-ae-gfx.jsx'],
+  jsx: ['jsx/uet-ae-motion.jsx', 'jsx/uet-ae-layout.jsx', 'jsx/uet-ae-gfx.jsx', 'jsx/uet-ae-fx.jsx'],
 
   setup(ctx) {
     const { $, log, busy, callHost } = ctx;
     const num = (id: string) => Number($<HTMLInputElement>(id).value);
+
+    // Layer animations
+    const rk = $<HTMLSelectElement>('aeRecKind'), rid = $<HTMLSelectElement>('aeRecId');
+    const fillRec = () => { rid.innerHTML = opts(ALL_LAYER_RECIPES.filter(r => r.kind === rk.value).map(r => [r.id, r.tr])); setDur(); };
+    const setDur = () => { const r = ALL_LAYER_RECIPES.find(x => x.id === rid.value); if (r) $<HTMLInputElement>('aeRecDur').value = String(r.duration); };
+    rk.onchange = fillRec; rid.onchange = setDur; fillRec();
+    const rApply = $<HTMLButtonElement>('aeRecApply');
+    rApply.onclick = busy(rApply, async () => {
+      const d = await runRecipe(ctx, rid.value, num('aeRecDur'), num('aeRecStagger') || 0);
+      log(`"${ALL_LAYER_RECIPES.find(r => r.id === rid.value)!.tr}" uygulandı: ${d.layers.join(', ')}.`, 'ok');
+    });
+
+    // Glow
+    const gApply = $<HTMLButtonElement>('aeGlowApply');
+    gApply.onclick = busy(gApply, async () => {
+      const g = GlowSchema.parse({ preset: $<HTMLSelectElement>('aeGlowPreset').value, size: num('aeGlowSize'), strength: num('aeGlowStrength'), color: $<HTMLInputElement>('aeGlowColor').value });
+      const d = await runGlow(ctx, g);
+      log(`Glow eklendi (${d.passes} kat): ${d.layers.join(', ')}.${skippedNote(d.skipped)}`, 'ok');
+    });
+    const gRem = $<HTMLButtonElement>('aeGlowRemove');
+    gRem.onclick = busy(gRem, async () => { const d = await must<any>(callHost('ae', 'removeGlow')); log(`${d.removed} glow efekti kaldırıldı.`, 'ok'); });
+
+    // Backgrounds
+    const bApply = $<HTMLButtonElement>('aeBgApply');
+    bApply.onclick = busy(bApply, async () => {
+      const b = BackgroundSchema.parse({ type: $<HTMLSelectElement>('aeBgType').value, palette: $<HTMLSelectElement>('aeBgPalette').value, size: $<HTMLSelectElement>('aeBgSize').value, loop: num('aeBgLoop'), motion: num('aeBgMotion'), grain: $<HTMLInputElement>('aeBgGrain').checked });
+      const args = backgroundArgs(b, await activeComp(ctx), newTag());
+      if (!$<HTMLInputElement>('aeBgPlace').checked) args.placeInActive = false;
+      const d = await must<any>(callHost('ae', 'createBackground', args));
+      log(`Arka plan "${d.comp}" oluşturuldu${d.placedIn ? `, "${d.placedIn}" kompozisyonunun en altına eklendi` : ''}.`, 'ok');
+    });
+
+    // Map route
+    const rtApply = $<HTMLButtonElement>('aeRtApply');
+    rtApply.onclick = busy(rtApply, async () => {
+      const r = RouteSchema.parse({ curve: num('aeRtCurve'), duration: num('aeRtDur'), color: $<HTMLInputElement>('aeRtColor').value, stroke: num('aeRtStroke'), dashed: $<HTMLInputElement>('aeRtDash').checked, pins: $<HTMLInputElement>('aeRtPins').checked, traveller: $<HTMLInputElement>('aeRtTrav').checked });
+      const d = await runRoute(ctx, r);
+      log(`Rota çizildi: "${d.route}"${d.traveller ? ' + hareket eden ok' : ''}.${d.warnings?.length ? ' Uyarı: ' + d.warnings.join('; ') : ''}`, 'ok');
+    });
 
     // Text
     const tsel = $<HTMLSelectElement>('aeTextPreset');
@@ -329,6 +468,30 @@ export const aeMotionModule: PanelModule = {
       title: { en: 'Arrange the selected layers (2+) as a spinning 3D carousel parented to a null', tr: '3D karusel' },
       params: CarouselSchema,
       run: async (p: any) => runCarousel(ctx, p),
+    });
+    reg.register({
+      id: 'ae.layerAnimate', app: 'ae', destructive: true,
+      title: { en: `Animate the selected layers (relative to their current values). Animations: ${ALL_LAYER_RECIPES.map(r => r.id).join(', ')}`, tr: 'Katman animasyonu' },
+      params: z.object({ id: z.enum(ALL_LAYER_RECIPES.map(r => r.id) as [string, ...string[]]), duration: z.number().positive().optional(), stagger: z.number().min(0).default(0.08) }),
+      run: async (p: any) => runRecipe(ctx, p.id, p.duration, p.stagger),
+    });
+    reg.register({
+      id: 'ae.glow', app: 'ae', destructive: true,
+      title: { en: 'Add a plug-in-free glow (native Glow passes) to the selected layers. Presets: soft, neon, deep, bloom', tr: 'Glow' },
+      params: GlowSchema,
+      run: async (p: any) => runGlow(ctx, p),
+    });
+    reg.register({
+      id: 'ae.background', app: 'ae', destructive: true,
+      title: { en: `Create a seamlessly looping animated background comp (mesh gradient or blurred blobs). Palettes: ${Object.keys(PALETTES).join(', ')}; sizes: match, ${Object.keys(SIZES).join(', ')}`, tr: 'Arka plan' },
+      params: BackgroundSchema,
+      run: async (p: any) => runBackground(ctx, p),
+    });
+    reg.register({
+      id: 'ae.mapRoute', app: 'ae', destructive: true,
+      title: { en: 'Draw an animated route through the selected layers (city markers on the user\'s map, in order), with pins and a traveller arrow', tr: 'Harita rotası' },
+      params: RouteSchema,
+      run: async (p: any) => runRoute(ctx, p),
     });
     reg.register({
       id: 'ae.title', app: 'ae', destructive: true,

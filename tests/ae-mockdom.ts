@@ -30,6 +30,16 @@ export class Node {
   }
 }
 
+/** Effect parameter defaults by index (match name = '<effect>-000n'). */
+const C4 = [0, 0, 0, 1];
+export const EFFECTS: Record<string, any[]> = {
+  'ADBE Slider Control': [0],
+  'ADBE Glo2': [2, 60, 10, 1, 2, 3, 1, 1, 1, 0, 0.5, C4, C4, 1],
+  'ADBE 4ColorGradient': [[0, 0], C4, [0, 0], C4, [0, 0], C4, [0, 0], C4, 100, 0, 100, 1],
+  'ADBE Gaussian Blur 2': [0, 1, 0],
+  'ADBE Noise': [0, 1, 1],
+};
+
 export class LayerBase {
   epoch = 0;
   root = new Node('root', 'root');
@@ -37,6 +47,10 @@ export class LayerBase {
   threeDLayer = false;
   motionBlur = false;
   startTime = 0;
+  adjustmentLayer = false;
+  timeRemapEnabled = false;
+  canSetTimeRemapEnabled = true;
+  moveToEnd() { (this as any).__movedToEnd = true; }
   moveAfter(other: any) { (this as any).__movedAfter = other.name; }
   constructor(public name: string, public inPoint = 0, public outPoint = 5, public rect = { left: 0, top: 0, width: 200, height: 100 }) {
     const tg = this.root.add(new Node('ADBE Transform Group', 'Transform'));
@@ -51,9 +65,10 @@ export class LayerBase {
     tg.add(new Node('ADBE Rotate Z', 'Rotation', 0));
     tg.add(new Node('ADBE Opacity', 'Opacity', 100));
     this.root.add(new Node('ADBE Effect Parade', 'Effects', undefined, m => {
-      if (m !== 'ADBE Slider Control') throw new Error('mock: unsupported effect ' + m);
-      const fx = new Node(m, 'Slider Control');
-      fx.add(new Node('ADBE Slider Control-0001', 'Slider', 0));
+      const params = EFFECTS[m];
+      if (!params) throw new Error('mock: unsupported effect ' + m);
+      const fx = new Node(m, m.replace('ADBE ', ''));
+      params.forEach((v, i) => fx.add(new Node(`${m}-${String(i + 1).padStart(4, '0')}`, `p${i + 1}`, clone(v))));
       return fx;
     }));
   }
@@ -97,6 +112,7 @@ export function wrap(n: Node, layer: LayerBase): any {
       if (i >= 0) { n.keys[i]!.v = clone(v); return; }
       n.keys.push({ t, v: clone(v), inT: KIT.BEZIER, outT: KIT.BEZIER }); n.keys.sort((a, b) => a.t - b.t);
     },
+    addKey(t: number) { api.setValueAtTime(t, n.valueAt(t)); return api.nearestKeyIndex(t); },
     nearestKeyIndex(t: number) { check(); let b = 1, d = Infinity; n.keys.forEach((k, i) => { if (Math.abs(k.t - t) < d) { d = Math.abs(k.t - t); b = i + 1; } }); return b; },
     keyValue(i: number) { check(); return clone(n.keys[i - 1]!.v); },
     setValueAtKey(i: number, v: any) { check(); shapeCheck(n, v); n.keys[i - 1]!.v = clone(v); },
@@ -161,7 +177,11 @@ const VECTOR_ITEMS: Record<string, () => Node> = {
   'ADBE Vector Shape - Ellipse': () => leafGroup('ADBE Vector Shape - Ellipse', [['ADBE Vector Ellipse Size', [100, 100]], ['ADBE Vector Ellipse Position', [0, 0]]]),
   'ADBE Vector Shape - Group': () => leafGroup('ADBE Vector Shape - Group', [['ADBE Vector Shape', { vertices: [], closed: true }]]),
   'ADBE Vector Graphic - Fill': () => leafGroup('ADBE Vector Graphic - Fill', [['ADBE Vector Fill Color', [1, 0, 0, 1]], ['ADBE Vector Fill Opacity', 100]]),
-  'ADBE Vector Graphic - Stroke': () => leafGroup('ADBE Vector Graphic - Stroke', [['ADBE Vector Stroke Color', [1, 1, 1, 1]], ['ADBE Vector Stroke Width', 2], ['ADBE Vector Stroke Line Cap', 1], ['ADBE Vector Stroke Line Join', 1]]),
+  'ADBE Vector Graphic - Stroke': () => {
+    const g = leafGroup('ADBE Vector Graphic - Stroke', [['ADBE Vector Stroke Color', [1, 1, 1, 1]], ['ADBE Vector Stroke Width', 2], ['ADBE Vector Stroke Line Cap', 1], ['ADBE Vector Stroke Line Join', 1]]);
+    g.add(new Node('ADBE Vector Stroke Dashes', 'Dashes', undefined, m => new Node(m, 'Dash', 10)));
+    return g;
+  },
   'ADBE Vector Filter - Trim': () => leafGroup('ADBE Vector Filter - Trim', [['ADBE Vector Trim Start', 0], ['ADBE Vector Trim End', 100], ['ADBE Vector Trim Offset', 0]]),
 };
 function leafGroup(m: string, props: Array<[string, any]>): Node {
@@ -190,34 +210,42 @@ export class Shape { vertices: number[][] = []; closed = true; }
 
 export class CameraLayer { name = 'Camera'; inPoint = 0; outPoint = 5; parent = null; property() { return null; } }
 
-export function makeComp(selected: any[]) {
+export function makeComp(selected: any[], props: Record<string, any> = {}) {
   const all: any[] = [...selected];
   class CompItem {
-    width = 1920; height = 1080; time = 2; duration = 20; frameDuration = 1 / 25; motionBlur = false;
+    name = 'Main'; width = 1920; height = 1080; time = 2; duration = 20; frameDuration = 1 / 25; frameRate = 25; motionBlur = false;
+    openInViewer() { (this as any).__opened = true; }
     selectedLayers = selected;
     layers = {
       addText: (s: string) => { const l = new TextLayer('Text', 0, 20, s); all.unshift(l); return l; },
       addShape: () => { const l = new ShapeLayer(); all.unshift(l); return l; },
+      addSolid: (color: number[], name: string, w: number, h: number) => { const l = new AVLayer(name, 0, 20, { left: 0, top: 0, width: w, height: h }); (l as any).color = color; all.unshift(l); return l; },
+      add: (item: any) => { const l = new AVLayer(item.name, 0, item.duration); (l as any).source = item; l.root.add(new Node('ADBE Time Remapping', 'Time Remap', 0)); all.unshift(l); return l; },
       addNull: () => { const l = new AVLayer('Null 1', 0, 20, { left: 0, top: 0, width: 100, height: 100 }); l.node('ADBE Transform Group', 'ADBE Anchor Point').val = [50, 50, 0]; all.unshift(l); return l; },
     };
     all = all;
     get numLayers() { return all.length; }
     layer(i: number) { return all[i - 1]; }
   }
-  return new CompItem();
+  return Object.assign(new CompItem(), props);
 }
 
-export function loadAe(selected: any[], files = ['uet-ae.jsx', 'uet-ae-motion.jsx', 'uet-ae-layout.jsx', 'uet-ae-gfx.jsx']) {
+export function loadAe(selected: any[], files = ['uet-ae.jsx', 'uet-ae-motion.jsx', 'uet-ae-layout.jsx', 'uet-ae-gfx.jsx', 'uet-ae-fx.jsx']) {
   const comp = makeComp(selected);
   const undo: string[] = [];
+  const created: any[] = [];
+  const project: any = {
+    activeItem: comp, file: null,
+    items: { addComp: (name: string, w: number, h: number, _pa: number, dur: number, fps: number) => { const c = makeComp([], { name, width: w, height: h, duration: dur, frameRate: fps, time: 0 }); created.push(c); return c; } },
+  };
   const ctx: any = {
     JSON, Math, String, Object, KeyframeEase, Shape, TextLayer, AVLayer, CompItem: comp.constructor,
     KeyframeInterpolationType: KIT,
     ParagraphJustification: { CENTER_JUSTIFY: 7415, LEFT_JUSTIFY: 7413, RIGHT_JUSTIFY: 7414 },
-    app: { version: '26.0', project: { activeItem: comp, file: null }, beginUndoGroup: (n: string) => undo.push('begin:' + n), endUndoGroup: () => undo.push('end') },
+    app: { version: '26.0', project, beginUndoGroup: (n: string) => undo.push('begin:' + n), endUndoGroup: () => undo.push('end') },
   };
   vm.createContext(ctx);
   for (const f of files) vm.runInContext(readFileSync(`packages/host-ae/jsx/${f}`, 'utf8'), ctx, { filename: f });
   const call = (fn: string, args?: unknown) => JSON.parse(ctx.UET.ae[fn](args === undefined ? undefined : JSON.stringify(args)));
-  return { ctx, comp, undo, call };
+  return { ctx, comp, undo, call, created, project };
 }
