@@ -328,6 +328,57 @@ UET.ppro = (function () {
     } catch (e) { return fail(e); }
   }
 
+  function motionScale(clip) {
+    var i, j;
+    for (i = 0; i < clip.components.numItems; i++) {
+      var c = clip.components[i];
+      if (c.matchName === 'AE.ADBE Motion' || c.displayName === 'Motion') {
+        for (j = 0; j < c.properties.numItems; j++) if (c.properties[j].displayName === 'Scale') return c.properties[j];
+        return c.properties.numItems > 1 ? c.properties[1] : null; // Position, Scale, …
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Reframe (F-FMT-03): clone the active sequence into a new one with another frame size and rescale every
+   * video clip to fill (crop) or fit (letterbox) the new frame. Original sequence untouched. UNVERIFIED in Premiere.
+   * args: { width, height, mode: 'fill'|'fit', name? }
+   */
+  function reframeSequence(json) {
+    try {
+      var args = JSON.parse(json);
+      var seq = activeSeq();
+      var s0 = seq.getSettings();
+      var w0 = s0.videoFrameWidth, h0 = s0.videoFrameHeight;
+      var known = {}, q;
+      for (q = 0; q < app.project.sequences.numSequences; q++) known[app.project.sequences[q].sequenceID] = true;
+      seq.clone();
+      var copy = null;
+      for (q = 0; q < app.project.sequences.numSequences; q++) if (!known[app.project.sequences[q].sequenceID]) { copy = app.project.sequences[q]; break; }
+      if (!copy) throw new Error('Could not clone the sequence.');
+      copy.name = args.name || (seq.name + ' - ' + args.width + 'x' + args.height);
+      var s = copy.getSettings();
+      s.videoFrameWidth = args.width; s.videoFrameHeight = args.height;
+      copy.setSettings(s);
+      var sx = args.width / w0, sy = args.height / h0;
+      var f = args.mode === 'fit' ? Math.min(sx, sy) : Math.max(sx, sy);
+      var n = 0, skipped = 0, t, k;
+      for (t = 0; t < copy.videoTracks.numTracks; t++) {
+        var clips = copy.videoTracks[t].clips;
+        for (k = 0; k < clips.numItems; k++) {
+          var sc = motionScale(clips[k]);
+          if (!sc) { skipped++; continue; }
+          if (sc.isTimeVarying()) { skipped++; continue; } // keyed scale: leave for the editor
+          sc.setValue(sc.getValue() * f, true);
+          n++;
+        }
+      }
+      app.project.openSequence(copy.sequenceID);
+      return ok({ sequence: copy.name, width: args.width, height: args.height, factor: Math.round(f * 1000) / 1000, clips: n, skipped: skipped, original: seq.name });
+    } catch (e) { return fail(e); }
+  }
+
   /** Spike S2: report which QE DOM features exist on this Premiere build. Changes nothing. */
   function qeProbe() {
     try {
@@ -347,5 +398,5 @@ UET.ppro = (function () {
     } catch (e) { return fail(e); }
   }
 
-  return { ping: ping, getSelectedClipInfo: getSelectedClipInfo, addMarkers: addMarkers, buildFromRanges: buildFromRanges, importCaptions: importCaptions, exportFrame: exportFrame, tidyProject: tidyProject, untidyProject: untidyProject, duckTrack: duckTrack, unduckTrack: unduckTrack, qeProbe: qeProbe, TICKS: TICKS };
+  return { ping: ping, getSelectedClipInfo: getSelectedClipInfo, addMarkers: addMarkers, buildFromRanges: buildFromRanges, importCaptions: importCaptions, exportFrame: exportFrame, tidyProject: tidyProject, untidyProject: untidyProject, duckTrack: duckTrack, unduckTrack: unduckTrack, reframeSequence: reframeSequence, qeProbe: qeProbe, TICKS: TICKS };
 }());

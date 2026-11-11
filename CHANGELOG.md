@@ -5,6 +5,7 @@
 - Added monorepo (pnpm, TypeScript, Vitest, esbuild), `@uet/core`, `@uet/engine`, AE and Premiere ExtendScript
   libraries, one CEP panel for both apps (Turkish UI), Mac installer and Turkish H-test guide.
 - Added MCP stdio server (`mcp.mjs`) so Claude Desktop can drive the panel tools (silence cut, AE recipes).
+- Added Reframe (Dikey Format) for Premiere: 9:16 / 1:1 / 4:5 / 16:9 copy of the sequence.
 - Added preset library v1: save/apply/delete settings on every tool, folders, trash, .uetpack import/export (also as MCP tools).
 - Added GitHub Actions CI.
 - Real Premiere 26.5.2 read-only API test passed via the MCP bridge (ping, QE razor/setSpeed present, clip info, Volume Level units).

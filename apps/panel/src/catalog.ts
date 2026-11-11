@@ -41,7 +41,7 @@ export const CATALOG: CatalogItem[] = [
   P('edit', 'roughcut', 'Kaba Kurgu', 'Eee/ııı ve tekrar çekimleri temizle', 'soon', 'wave', { feature: 'F-AI-04', keys: 'filler tekrar' }),
   P('edit', 'scenes', 'Sahne Bulucu', 'Çekim değişimlerinde marker koy veya parçalara böl', 'beta', 'grid', { view: 'v-scenes', keys: 'sahne scene shot kesim', feature: 'F-PROD-04' }),
   P('edit', 'beatedit', 'Ritme Kurgu', 'Klipleri müziğin vuruşlarına diz', 'soon', 'meter', { feature: 'F-PROD-09', keys: 'beat müzik' }),
-  P('edit', 'reframe', 'Dikey Format', '9:16, 1:1, 4:5 için yeni sekans', 'soon', 'grid', { feature: 'F-FMT-03', keys: 'reels shorts tiktok' }),
+  P('edit', 'reframe', 'Dikey Format', '9:16, 1:1, 4:5 için yeni sekans, orijinal kalır', 'beta', 'grid', { view: 'v-reframe', feature: 'F-FMT-03', keys: 'reels shorts tiktok dikey reframe format' }),
   P('edit', 'podcast', 'Podcast Kurgusu', 'Konuşan kişiye otomatik geçiş', 'soon', 'grid', { feature: 'F-FMT-01' }),
   P('audio', 'loudness', 'Ses Seviyesi', 'LUFS ölç, platform hedefine göre kazanç', 'beta', 'meter', { view: 'v-loudness', keys: 'lufs loudness ses yüksekliği', feature: 'F-AU-04' }),
   P('audio', 'ducking', 'Müzik Kısma', 'Konuşma varken müziği otomatik kıs', 'beta', 'meter', { view: 'v-duck', feature: 'F-AU-03', keys: 'ducking müzik kıs konuşma' }),

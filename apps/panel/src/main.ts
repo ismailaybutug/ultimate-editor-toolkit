@@ -407,6 +407,12 @@ async function unduckAction() {
   return r.data;
 }
 
+async function reframeAction(p: { width: number; height: number; mode: 'fill' | 'fit' }) {
+  const r = await callHost<any>('ppro', 'reframeSequence', p);
+  if (!r.ok) throw new Error(r.error);
+  return r.data;
+}
+
 async function applyRecipeById(p: { recipeId: string; duration?: number; stagger: number }) {
   const base = BUILTIN_RECIPES.find(x => x.id === p.recipeId);
   if (!base) throw new Error(`Unknown recipe ${p.recipeId}`);
@@ -455,6 +461,12 @@ function registerHostTools(reg: any) {
       title: { en: 'Undo the last project tidy (items back to root, empty UET bins removed)', tr: 'Proje düzenini geri al' },
       params: z.object({}),
       run: untidyAction,
+    });
+    reg.register({
+      id: 'ppro.reframe', app: 'ppro', destructive: true,
+      title: { en: 'Copy the active sequence to a new frame size (e.g. 1080x1920 for Reels) and rescale clips to fill or fit; original untouched', tr: 'Dikey format' },
+      params: z.object({ width: z.number().int().min(64).max(8192).default(1080), height: z.number().int().min(64).max(8192).default(1920), mode: z.enum(['fill', 'fit']).default('fill') }),
+      run: reframeAction,
     });
     reg.register({
       id: 'ppro.duckMusic', app: 'ppro', destructive: true,
@@ -531,6 +543,12 @@ function setupPremiere() {
   ub.disabled = !localStorage.getItem(TIDY_KEY);
   tb.onclick = busy(tb, async () => { const r = await tidyAction({ dryRun: false }); log(`${r.moved.length} öğe klasörlere taşındı → ${describeBins(r.bins)}`, 'ok'); ub.disabled = !r.moved.length; });
   ub.onclick = busy(ub, async () => { const r = await untidyAction(); log(`${r.restored} öğe eski yerine döndü.`, 'ok'); ub.disabled = true; });
+  const rf = $<HTMLButtonElement>('rfBtn');
+  rf.onclick = busy(rf, async () => {
+    const [w, h] = $<HTMLSelectElement>('rfFormat').value.split('x').map(Number);
+    const r = await reframeAction({ width: w!, height: h!, mode: $<HTMLSelectElement>('rfMode').value as 'fill' | 'fit' });
+    log(`Yeni sekans: "${r.sequence}" (${r.width}×${r.height}), ${r.clips} klip ölçeklendi${r.skipped ? `, ${r.skipped} klip atlandı` : ''}. Orijinal "${r.original}" değişmedi.`, 'ok');
+  });
   const db = $<HTMLButtonElement>('duckBtn'), udb = $<HTMLButtonElement>('unduckBtn');
   udb.disabled = !localStorage.getItem(DUCK_KEY);
   db.onclick = busy(db, async () => {

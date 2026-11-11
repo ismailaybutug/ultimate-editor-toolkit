@@ -69,3 +69,40 @@ describe('Frame Export (mock)', () => {
     expect(r.data.exists).toBe(true);
   });
 });
+
+describe('Reframe (mock)', () => {
+  function setupSeq() {
+    const mkScale = (v: number, keyed = false) => ({ displayName: 'Scale', v, isTimeVarying: () => keyed, getValue() { return this.v; }, setValue(x: number) { this.v = x; } });
+    const mkClip = (scale: any) => ({ components: Object.assign([{ matchName: 'AE.ADBE Motion', displayName: 'Motion', properties: Object.assign([{ displayName: 'Position' }, scale], { numItems: 2 }) }], { numItems: 1 }) });
+    const scales = [mkScale(100), mkScale(50), mkScale(100, true)];
+    const seqs: any[] = [];
+    const settings = { videoFrameWidth: 1920, videoFrameHeight: 1080 };
+    const mkSeq = (id: string, name: string, clips: any[]): any => ({
+      sequenceID: id, name, videoTracks: Object.assign([{ clips: Object.assign(clips, { numItems: clips.length }) }], { numTracks: 1 }),
+      getSettings: () => ({ ...settings }), setSettings(s: any) { this.size = [s.videoFrameWidth, s.videoFrameHeight]; },
+      clone() { seqs.push(mkSeq('c', name + ' Copy', scales.map(mkClip))); },
+    });
+    const main: any = mkSeq('main', 'Main', []);
+    seqs.push(main);
+    const sequences = new Proxy({} as any, { get: (_o, k) => (k === 'numSequences' ? seqs.length : seqs[Number(k)]) });
+    const app: any = { project: { activeSequence: main, sequences, openSequence() {} } };
+    const ctx: any = { JSON, Math, Object, String, app };
+    vm.createContext(ctx);
+    vm.runInContext(readFileSync('packages/host-ppro/jsx/uet-ppro.jsx', 'utf8'), ctx);
+    return { UET: ctx.UET, seqs, scales };
+  }
+  it('16:9 → 9:16 fill scales unkeyed clips by 1.778 and leaves keyed ones', () => {
+    const p = setupSeq();
+    const r = JSON.parse(p.UET.ppro.reframeSequence(JSON.stringify({ width: 1080, height: 1920, mode: 'fill' })));
+    expect(r.data).toMatchObject({ clips: 2, skipped: 1, factor: 1.778, sequence: 'Main - 1080x1920' });
+    expect(p.seqs[1].size).toEqual([1080, 1920]);
+    expect(p.scales[0]!.v).toBeCloseTo(177.78, 1);
+    expect(p.scales[1]!.v).toBeCloseTo(88.89, 1);
+    expect(p.scales[2]!.v).toBe(100);
+  });
+  it('fit mode uses the smaller factor', () => {
+    const p = setupSeq();
+    const r = JSON.parse(p.UET.ppro.reframeSequence(JSON.stringify({ width: 1080, height: 1920, mode: 'fit' })));
+    expect(r.data.factor).toBe(0.563);
+  });
+});
