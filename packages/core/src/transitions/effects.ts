@@ -114,6 +114,28 @@ export const EFFECTS = {
       intensity: { unit: 'raw', ae: 'ADBE Glo2-0004' },
     },
   },
+  /** Reflects the image across a line. Premiere zoom-out uses four of them to fill the borders of a shrunk frame. */
+  mirror: {
+    ae: 'ADBE Mirror',
+    pprNames: ['Mirror'],
+    pprMatch: 'AE.ADBE Mirror',
+    params: {
+      center: { unit: 'point', ae: 'ADBE Mirror-0001', ppr: ['Reflection Center'], pprIndex: 0 },
+      angle: { unit: 'raw', ae: 'ADBE Mirror-0002', ppr: ['Reflection Angle'], pprIndex: 1 },
+    },
+  },
+  /** Premiere: draws a coloured circle over the clip (Generate > Circle). Used where AE uses a colour solid. */
+  circle: {
+    pprNames: ['Circle'],
+    pprMatch: 'AE.ADBE Circle',
+    params: {
+      center: { unit: 'point', ppr: ['Center'], pprIndex: 0 },
+      radius: { unit: 'px', ppr: ['Radius'], pprIndex: 1 },
+      featherOuter: { unit: 'px', ppr: ['Feather Outer Edge'] },
+      color: { unit: 'color', ppr: ['Color'] },
+      opacity: { unit: 'raw', ppr: ['Opacity'] },
+    },
+  },
 } satisfies Record<string, EffectDef>;
 
 export type EffectId = keyof typeof EFFECTS;

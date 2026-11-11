@@ -42,6 +42,11 @@ export const HalfSchema = z.object({
   blend: z.enum(['normal', 'add', 'screen']).optional(),
   /** Solid layers: layer opacity animation (0..100). */
   opacity: z.array(KeySchema).min(2).optional(),
+  /** Solid layers (AE): layer scale in % (uniform) and position as [fx, fy] offset from the frame centre. */
+  scale: z.array(KeySchema).min(2).optional(),
+  position: z.array(KeySchema).min(2).optional(),
+  /** Solid layers (AE): elliptical mask. radius = multiple of the frame's half-diagonal; feather in px at 1080. */
+  mask: z.object({ shape: z.literal('ellipse'), radius: z.number().positive(), feather: z.number().min(0).default(0) }).optional(),
   effects: z.array(EffectUseSchema),
 });
 export type Half = z.infer<typeof HalfSchema>;

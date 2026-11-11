@@ -124,6 +124,16 @@ UET.transitions = (function () {
 
   function value(ref, v) { return ref.unit === 'bool' ? !!v : v; }
 
+  /** Constant value; colours ([r, g, b] 0..1) go through setColorValue(alpha, r, g, b) with 0..255. */
+  function setParam(p, ref) {
+    if (ref.unit === 'color') {
+      var c = ref.value;
+      p.setColorValue(255, Math.round(c[0] * 255), Math.round(c[1] * 255), Math.round(c[2] * 255), true);
+    } else {
+      p.setValue(value(ref, ref.value), true);
+    }
+  }
+
   function timeObj(seconds) {
     if (typeof Time === 'undefined') return seconds;
     var t = new Time();
@@ -143,7 +153,7 @@ UET.transitions = (function () {
       qeItemFor(ti, clip, ord).addVideoEffect(fx);
       if (clip.components.numItems <= before) throw new Error('Premiere did not add ' + ef.names[0] + ' to ' + clip.name);
       var comp = clip.components[clip.components.numItems - 1];
-      for (j = 0; j < ef.set.length; j++) findParam(comp, ef.set[j]).setValue(value(ef.set[j], ef.set[j].value), true);
+      for (j = 0; j < ef.set.length; j++) setParam(findParam(comp, ef.set[j]), ef.set[j]);
       for (j = 0; j < ef.tracks.length; j++) {
         var tr = ef.tracks[j], p = findParam(comp, tr);
         p.setTimeVarying(true);

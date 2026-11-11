@@ -6,7 +6,7 @@
  * Layers are tagged in their comment ("uet-transition:<id>:<side>") so applying again at the same cut replaces them.
  * STATUS: UNVERIFIED in After Effects until TEST_REPORT.md says otherwise.
  */
-/* global app, CompItem, KeyframeEase, KeyframeInterpolationType, BlendingMode */
+/* global app, CompItem, KeyframeEase, KeyframeInterpolationType, BlendingMode, Shape */
 var UET = UET || {};
 UET.transitions = (function () {
   var TAG = 'uet-transition:';
@@ -65,10 +65,30 @@ UET.transitions = (function () {
     return out;
   }
 
+  /**
+   * Fit a compiled value to the property's shape: a scalar scale becomes [s, s(, s)], a 2-D position keeps the
+   * layer's z. Returns { v, n } where n = how many times each ease entry must be repeated.
+   */
+  function fitValue(prop, v) {
+    var cur = prop.value, out, i;
+    if (!isArray(cur)) return { v: v, n: 1 };
+    if (!isArray(v)) { out = []; for (i = 0; i < cur.length; i++) out.push(v); return { v: out, n: cur.length }; }
+    out = v.slice(0, cur.length);
+    for (i = out.length; i < cur.length; i++) out.push(cur[i]);
+    return { v: out, n: 1 };
+  }
+
+  function repeatEase(list, n, len) {
+    if (n === 1 && list.length === len) return list;
+    var out = [], i;
+    for (i = 0; i < len; i++) out.push(list[Math.min(i, list.length - 1)]);
+    return out;
+  }
+
   /** Write compiled keys (times relative to the cut) with their precomputed AE eases. */
   function writeKeys(prop, keys, cut) {
-    var i, idx = [];
-    for (i = 0; i < keys.length; i++) prop.setValueAtTime(cut + keys[i].t, keys[i].v);
+    var i, idx = [], fit = [];
+    for (i = 0; i < keys.length; i++) { fit.push(fitValue(prop, keys[i].v)); prop.setValueAtTime(cut + keys[i].t, fit[i].v); }
     for (i = 0; i < keys.length; i++) idx.push(prop.nearestKeyIndex(cut + keys[i].t));
     for (i = 0; i < keys.length; i++) {
       var hold = keys[i].hold ? KeyframeInterpolationType.HOLD : KeyframeInterpolationType.BEZIER;
@@ -77,12 +97,13 @@ UET.transitions = (function () {
     var spatial = false;
     try { spatial = prop.isSpatial; } catch (e0) { spatial = false; }
     for (i = 0; i < keys.length; i++) {
-      var k = keys[i];
-      var useSp = spatial || !isArray(k.v);
-      var inE = easeList(useSp ? k.inSp : k.inE), outE = easeList(useSp ? k.outSp : k.outE);
-      prop.setTemporalEaseAtKey(idx[i], inE, outE);
-      if (spatial && isArray(k.v)) {
-        try { prop.setSpatialTangentsAtKey(idx[i], [0, 0, 0].slice(0, k.v.length), [0, 0, 0].slice(0, k.v.length)); } catch (e1) { /* 2D vs 3D */ }
+      var k = keys[i], fv = fit[i].v;
+      var dims = spatial || !isArray(fv) ? 1 : fv.length;
+      var inE = spatial ? k.inSp : k.inE, outE = spatial ? k.outSp : k.outE;
+      if (!spatial && !isArray(k.v)) { inE = k.inE; outE = k.outE; }
+      prop.setTemporalEaseAtKey(idx[i], easeList(repeatEase(inE, fit[i].n, dims)), easeList(repeatEase(outE, fit[i].n, dims)));
+      if (spatial && isArray(fv)) {
+        try { prop.setSpatialTangentsAtKey(idx[i], [0, 0, 0].slice(0, fv.length), [0, 0, 0].slice(0, fv.length)); } catch (e1) { /* 2D vs 3D */ }
       }
     }
   }
@@ -91,6 +112,19 @@ UET.transitions = (function () {
     var p = group.property(match);
     if (!p) throw new Error(what + ': property ' + match + ' not found in this After Effects version');
     return p;
+  }
+
+  /** Circle mask (4 bezier vertices) centred on (cx, cy) in layer pixels. */
+  function addEllipseMask(layer, cx, cy, r, feather) {
+    var m = layer.property('ADBE Mask Parade').addProperty('ADBE Mask Atom');
+    var s = new Shape(), t = r * 0.5523;
+    s.vertices = [[cx, cy - r], [cx + r, cy], [cx, cy + r], [cx - r, cy]];
+    s.inTangents = [[-t, 0], [0, -t], [t, 0], [0, t]];
+    s.outTangents = [[t, 0], [0, t], [-t, 0], [0, -t]];
+    s.closed = true;
+    m.property('ADBE Mask Shape').setValue(s);
+    if (feather > 0) m.property('ADBE Mask Feather').setValue([feather, feather]);
+    return m;
   }
 
   function addHalf(comp, plan, h, cut, ref) {
@@ -117,7 +151,11 @@ UET.transitions = (function () {
       for (j = 0; j < ef.set.length; j++) child(fx, ef.set[j].match, ef.effect).setValue(ef.set[j].value);
       for (j = 0; j < ef.tracks.length; j++) writeKeys(child(fx, ef.tracks[j].match, ef.effect), ef.tracks[j].keys, cut);
     }
-    if (h.opacity) writeKeys(layer.property('ADBE Transform Group').property('ADBE Opacity'), h.opacity.keys, cut);
+    var xf = layer.property('ADBE Transform Group');
+    if (h.opacity) writeKeys(xf.property('ADBE Opacity'), h.opacity.keys, cut);
+    if (h.scale) writeKeys(xf.property('ADBE Scale'), h.scale.keys, cut);
+    if (h.position) writeKeys(xf.property('ADBE Position'), h.position.keys, cut);
+    if (h.mask) addEllipseMask(layer, comp.width / 2, comp.height / 2, h.mask.radius, h.mask.feather);
     return layer;
   }
 

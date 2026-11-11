@@ -54,7 +54,7 @@ function aeEffect(match: string) {
   };
 }
 
-const KNOWN_AE = ['ADBE Geometry2', 'ADBE Tile', 'ADBE Offset', 'ADBE Motion Blur', 'ADBE Gaussian Blur 2', 'ADBE Wave Warp', 'ADBE Brightness & Contrast 2', 'ADBE Glo2'];
+const KNOWN_AE = ['ADBE Mirror', 'ADBE Geometry2', 'ADBE Tile', 'ADBE Offset', 'ADBE Motion Blur', 'ADBE Gaussian Blur 2', 'ADBE Wave Warp', 'ADBE Brightness & Contrast 2', 'ADBE Glo2'];
 
 function loadAe(opts: { time?: number; selectedInPoints?: number[] } = {}) {
   const undo: string[] = [];
@@ -62,14 +62,22 @@ function loadAe(opts: { time?: number; selectedInPoints?: number[] } = {}) {
   const mkLayer = (name: string, inPoint: number, outPoint: number) => {
     const effects: any[] = [];
     const opacity = new AeProp('ADBE Opacity', 100);
+    const scale = new AeProp('ADBE Scale', [100, 100, 100]);
+    const position = new AeProp('ADBE Position', [960, 540, 0], true);
+    const masks: any[] = [];
     const l: any = {
-      name, inPoint, outPoint, startTime: inPoint, comment: '', adjustmentLayer: false, blendingMode: 0, label: 0, effects, opacity,
+      name, inPoint, outPoint, startTime: inPoint, comment: '', adjustmentLayer: false, blendingMode: 0, label: 0, effects, opacity, scale, position, masks,
       get index() { return layers.indexOf(l) + 1; },
       remove() { layers.splice(layers.indexOf(l), 1); },
       moveBefore(o: any) { layers.splice(layers.indexOf(l), 1); layers.splice(layers.indexOf(o), 0, l); },
       property(n: string) {
         if (n === 'ADBE Effect Parade') return { addProperty: (m: string) => { if (!KNOWN_AE.includes(m)) return null; const e = aeEffect(m); effects.push(e); return e; } };
-        if (n === 'ADBE Transform Group') return { property: (p: string) => (p === 'ADBE Opacity' ? opacity : null) };
+        if (n === 'ADBE Transform Group') return { property: (p: string) => ({ 'ADBE Opacity': opacity, 'ADBE Scale': scale, 'ADBE Position': position } as any)[p] ?? null };
+        if (n === 'ADBE Mask Parade') return { addProperty: (m: string) => {
+          if (m !== 'ADBE Mask Atom') return null;
+          const mk: any = { shape: null, feather: null, property: (p: string) => ({ 'ADBE Mask Shape': { setValue: (v: any) => { mk.shape = v; } }, 'ADBE Mask Feather': { setValue: (v: any) => { mk.feather = v; } } } as any)[p] };
+          masks.push(mk); return mk;
+        } };
         throw new Error('no prop ' + n);
       },
     };
@@ -85,7 +93,7 @@ function loadAe(opts: { time?: number; selectedInPoints?: number[] } = {}) {
   }
   const comp = new CompItem();
   const ctx: any = {
-    JSON, Math, String, Object, KeyframeEase, CompItem, KeyframeInterpolationType: KIT, BlendingMode: { ADD: 5220, SCREEN: 5222 },
+    JSON, Math, String, Object, KeyframeEase, CompItem, Shape: class { vertices: any; inTangents: any; outTangents: any; closed = false; }, KeyframeInterpolationType: KIT, BlendingMode: { ADD: 5220, SCREEN: 5222 },
     app: { project: { activeItem: comp }, beginUndoGroup: (n: string) => undo.push('begin:' + n), endUndoGroup: () => undo.push('end') },
   };
   vm.createContext(ctx);
@@ -124,6 +132,9 @@ describe('uet-transitions-ae.jsx on mock AE DOM', () => {
           t.keys.forEach((k, j) => expect(p.keys[j]!.outType).toBe(k.hold ? KIT.HOLD : KIT.BEZIER));
         }));
         if (h.opacity) expect(l.opacity.numKeys).toBe(h.opacity.keys.length);
+        if (h.scale) { expect(l.scale.numKeys).toBe(h.scale.keys.length); expect(l.scale.keys[0]!.v).toHaveLength(3); }
+        if (h.position) { expect(l.position.numKeys).toBe(h.position.keys.length); expect(l.position.keys[0]!.v).toHaveLength(3); }
+        if (h.mask) { expect(l.masks).toHaveLength(1); expect(l.masks[0].shape.vertices).toHaveLength(4); expect(l.masks[0].shape.closed).toBe(true); }
       }
       // Applying again at the same cut replaces instead of stacking.
       const again = JSON.parse(T.apply(JSON.stringify({ plan, cut: info.cut })));
@@ -154,6 +165,8 @@ const PPR_PARAMS: Record<string, string[]> = {
   'Gaussian Blur': ['Blurriness', 'Blur Dimensions', 'Repeat Edge Pixels'],
   'Wave Warp': ['Wave Type', 'Wave Height', 'Wave Width', 'Direction', 'Wave Speed', 'Pinning', 'Phase', 'Antialiasing'],
   'Brightness & Contrast': ['Brightness', 'Contrast'],
+  Mirror: ['Reflection Center', 'Reflection Angle'],
+  Circle: ['Center', 'Radius', 'Edge', 'Thickness', 'Feather Outer Edge', 'Feather Inner Edge', 'Invert Circle', 'Color', 'Opacity', 'Blending Mode'],
 };
 
 function pprComponent(name: string) {
@@ -161,6 +174,7 @@ function pprComponent(name: string) {
     const p: any = {
       displayName, value: 0, varying: false, keys: [] as { t: number; v: any }[],
       setValue(v: any) { p.value = v; },
+      setColorValue(a: number, r: number, g: number, b: number) { p.value = [a, r, g, b]; },
       setTimeVarying(b: boolean) { p.varying = b; },
       isTimeVarying() { return p.varying; },
       getValue() { return p.value; },
@@ -231,7 +245,8 @@ describe('uet-transitions-ppro.jsx on mock Premiere DOM', () => {
           for (const s of e.set) {
             const p = comp.params.find((x: any) => s.names.includes(x.displayName));
             expect(p, `${e.effect}.${s.param}`).toBeTruthy();
-            expect(p.value).toEqual(s.unit === 'bool' ? !!s.value : s.value);
+            const want = s.unit === 'bool' ? !!s.value : s.unit === 'color' ? [255, ...(s.value as number[]).map(x => Math.round(x * 255))] : s.value;
+            expect(p.value).toEqual(want);
           }
           for (const t of e.tracks) {
             const p = comp.params.find((x: any) => t.names.includes(x.displayName));
