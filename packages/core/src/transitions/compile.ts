@@ -45,7 +45,14 @@ export interface AeEase { speed: number; influence: number }
 export interface AeKey { t: number; v: Value; hold?: boolean; inE: AeEase[]; outE: AeEase[]; inSp: AeEase[]; outSp: AeEase[] }
 export interface AeTrack { param: string; match: string; keys: AeKey[] }
 export interface AeEffect { effect: string; match: string; set: { param: string; match: string; value: Value }[]; tracks: AeTrack[] }
-export interface AeHalf { side: 'out' | 'in'; start: number; end: number; layer: 'adjustment' | 'solid'; color?: number[]; blend?: string; opacity?: AeTrack; effects: AeEffect[] }
+export interface AeHalf {
+  side: 'out' | 'in'; start: number; end: number; layer: 'adjustment' | 'solid'; color?: number[]; blend?: string;
+  /** Layer transform tracks (ADBE Opacity / ADBE Scale / ADBE Position). Scalar scale is expanded by the host. */
+  opacity?: AeTrack; scale?: AeTrack; position?: AeTrack;
+  /** Elliptical mask in layer pixels. */
+  mask?: { radius: number; feather: number };
+  effects: AeEffect[];
+}
 export interface AeTransition { host: 'ae'; id: string; name: string; fps: number; halves: AeHalf[] }
 
 const DEFAULT_EASE: AeEase = { speed: 0, influence: 16.666667 };
@@ -104,6 +111,9 @@ export function compileForAe(plan: TransitionPlan, f: Frame): AeTransition {
       }),
     };
     if (h.opacity) res.opacity = { param: 'opacity', match: 'ADBE Opacity', keys: aeKeys(retime(h.opacity, k)) };
+    if (h.scale) res.scale = { param: 'scale', match: 'ADBE Scale', keys: aeKeys(retime(h.scale, k)) };
+    if (h.position) res.position = { param: 'position', match: 'ADBE Position', keys: aeKeys(retime(h.position, k).map(x => ({ ...x, v: convert('point', x.v, f, 'ae') }))) };
+    if (h.mask) res.mask = { radius: (h.mask.radius * Math.hypot(f.width, f.height)) / 2, feather: (h.mask.feather * f.height) / 1080 };
     return res;
   });
   return { host: 'ae', id: plan.id, name: plan.name, fps: f.fps, halves };

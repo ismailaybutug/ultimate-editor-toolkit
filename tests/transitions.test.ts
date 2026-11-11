@@ -15,7 +15,10 @@ const FRAMES = [
 /** Neutral value per abstract param: what the image looks like with no effect. */
 const NEUTRAL: Record<string, number | number[]> = {
   scale: 100, rotation: 0, shift: [0, 0], length: 0, blurriness: 0, height: 0, brightness: 0, intensity: 0,
+  radius: 0, opacity: 0,
 };
+/** Mirror lines are neutral when they sit on the frame edge (nothing beyond the edge to reflect into view). */
+const onEdge = (v: number[]) => Math.abs(Math.abs(v[0]!) - 0.5) < 1e-9 || Math.abs(Math.abs(v[1]!) - 0.5) < 1e-9;
 
 function variants(host: Host) {
   const out: { name: string; plan: TransitionPlan }[] = [];
@@ -33,7 +36,8 @@ function variants(host: Host) {
 describe('transition library', () => {
   it('has unique ids and every family is represented', () => {
     expect(new Set(TRANSITIONS.map(t => t.id)).size).toBe(TRANSITIONS.length);
-    expect(new Set(TRANSITIONS.map(t => t.family))).toEqual(new Set(['camera', 'glitch', 'distort', 'light', 'blur']));
+    expect(new Set(TRANSITIONS.map(t => t.family))).toEqual(new Set(['camera', 'glitch', 'distort', 'light', 'shape', 'film', 'blur']));
+    expect(TRANSITIONS.every(t => t.hosts.includes('ae') && t.hosts.includes('ppro'))).toBe(true);
   });
 
   for (const host of ['ae', 'ppro'] as Host[]) {
@@ -43,19 +47,23 @@ describe('transition library', () => {
         for (const h of plan.halves) {
           const edge = h.side === 'out' ? -plan.dOut : plan.dIn;
           for (const e of h.effects) for (const t of e.tracks ?? []) {
-            expect(evalKeys(t.keys, edge), `${name} ${h.side} ${e.effect}.${t.param}`).toEqual(NEUTRAL[t.param]);
+            const v = evalKeys(t.keys, edge), label = `${name} ${h.side} ${e.effect}.${t.param}`;
+            if (e.effect === 'mirror') expect(onEdge(v as number[]), label).toBe(true);
+            else if (e.effect === 'circle' && t.param === 'center') { /* film burn: invisible because opacity is 0 */ }
+            else expect(v, label).toEqual(NEUTRAL[t.param]);
             const ts = t.keys.map(k => k.t);
             expect(Math.min(...ts)).toBeGreaterThanOrEqual(h.side === 'out' ? -plan.dOut - 1e-9 : 0);
             expect(Math.max(...ts)).toBeLessThanOrEqual(h.side === 'out' ? 1e-9 : plan.dIn + 1e-9);
           }
           if (h.opacity) expect(evalKeys(h.opacity, edge), name).toBe(0);
+          else if (h.scale) expect(evalKeys(h.scale, edge), name).toBe(0);
+          if (h.layer === 'solid') expect(h.opacity || h.scale, `${name}: solid must fade or scale away`).toBeTruthy();
         }
       }
     });
   }
 
   it('refuses transitions a host cannot do, with a clear message', () => {
-    expect(() => buildTransition({ transition: 'flash', strength: 1 }, 'ppro')).toThrow(/not available in Premiere/);
     expect(() => buildTransition({ transition: 'whip', strength: 1, direction: 'cw' }, 'ae')).toThrow(/direction/);
     expect(() => buildTransition({ transition: 'nope', strength: 1 }, 'ae')).toThrow(/Unknown transition/);
     expect(() => buildTransition({ transition: 'blur', strength: 3 }, 'ae')).toThrow();
@@ -166,7 +174,9 @@ describe('compileForPpro', () => {
           expect(t.keys.length, name).toBe(n);
           t.keys.forEach(k => expect(Math.abs(k.t * f.fps - Math.round(k.t * f.fps))).toBeLessThan(1e-3));
           const edge = h.side === 'out' ? t.keys[0]! : t.keys.at(-1)!;
-          if (t.param === 'shift') expect(edge.v).toEqual([0.5, 0.5]);
+          if (e.effect === 'mirror') expect(onEdge((edge.v as number[]).map(x => x - 0.5))).toBe(true);
+          else if (e.effect === 'circle' && t.param === 'center') continue;
+          else if (t.param === 'shift') expect(edge.v).toEqual([0.5, 0.5]);
           else if (t.param === 'scale') expect(edge.v).toBe(100);
           else expect(edge.v, `${name} ${t.param}`).toBe(0);
         }
@@ -179,5 +189,61 @@ describe('compileForPpro', () => {
     expect(() => compileForPpro(flash, FRAMES[0]!)).toThrow(/coloured layer/);
     const spin = buildTransition({ transition: 'spin', strength: 1 }, 'ae');
     expect(() => compileForPpro(spin, FRAMES[0]!)).toThrow(/not available in Premiere/);
+  });
+});
+
+describe('Premiere versions of AE-style transitions', () => {
+  it('zoom-out mirrors follow the frame edge while it shrinks (never shows black borders)', () => {
+    const c = compileForPpro(buildTransition({ transition: 'zoom-out', strength: 2 }, 'ppro'), FRAMES[0]!);
+    const out = c.halves[0]!;
+    const scale = out.effects[0]!.tracks.find(t => t.param === 'scale')!.keys;
+    const right = out.effects.find(e => e.effect === 'mirror' && e.set[0]!.value === 0)!.tracks[0]!.keys;
+    scale.forEach((k, i) => expect(right[i]!.v).toEqual([0.5 + (k.v as number) / 200, 0.5].map(x => Math.round(x * 1e6) / 1e6)));
+    expect(Math.min(...scale.map(k => k.v as number))).toBeGreaterThanOrEqual(40 - 1e-9);
+  });
+
+  it('spin scales up just enough to cover the frame at every angle', () => {
+    for (const f of [FRAMES[0]!, FRAMES[1]!]) {
+      const p = buildTransition({ transition: 'spin', strength: 1 }, 'ppro', f);
+      const c = compileForPpro(p, f);
+      for (const h of c.halves) {
+        const tr = h.effects[0]!.tracks;
+        const rot = tr.find(t => t.param === 'rotation')!.keys, sc = tr.find(t => t.param === 'scale')!.keys;
+        rot.forEach((k, i) => {
+          const r = ((k.v as number) * Math.PI) / 180, s = (sc[i]!.v as number) / 100;
+          // every frame corner, rotated back into the scaled image, must lie inside it
+          for (const [x, y] of [[f.width / 2, f.height / 2], [f.width / 2, -f.height / 2]] as const) {
+            const xr = Math.abs(x * Math.cos(r) + y * Math.sin(r)), yr = Math.abs(-x * Math.sin(r) + y * Math.cos(r));
+            expect(xr).toBeLessThanOrEqual((s * f.width) / 2 + 0.5);
+            expect(yr).toBeLessThanOrEqual((s * f.height) / 2 + 0.5);
+          }
+        });
+      }
+    }
+  });
+
+  it('flash, circle and film burn use the Circle effect with the chosen colour', () => {
+    for (const id of ['flash', 'circle', 'film-burn']) {
+      const c = compileForPpro(buildTransition({ transition: id, strength: 1, color: '#336699' }, 'ppro'), FRAMES[0]!);
+      for (const h of c.halves) {
+        expect(h.effects[0]!.effect).toBe('circle');
+        expect(h.effects[0]!.set.find(s => s.param === 'color')!.value).toEqual([0x33 / 255, 0x66 / 255, 0x99 / 255]);
+      }
+    }
+  });
+});
+
+describe('AE solid transitions', () => {
+  it('circle uses an elliptical mask covering the frame and scales from 0', () => {
+    const f = FRAMES[1]!;
+    const c = compileForAe(buildTransition({ transition: 'circle', strength: 1 }, 'ae'), f);
+    expect(c.halves[0]!.mask!.radius).toBeCloseTo(Math.hypot(f.width, f.height) / 2);
+    expect(c.halves[0]!.scale!.keys[0]!.v).toBe(0);
+    expect(c.halves[1]!.scale!.keys.at(-1)!.v).toBe(0);
+  });
+  it('film burn sweeps its position in layer pixels', () => {
+    const c = compileForAe(buildTransition({ transition: 'film-burn', strength: 1 }, 'ae'), FRAMES[0]!);
+    expect(c.halves[0]!.position!.keys.at(-1)!.v).toEqual([960, 540]);
+    expect(c.halves[0]!).toMatchObject({ layer: 'solid', blend: 'add' });
   });
 });

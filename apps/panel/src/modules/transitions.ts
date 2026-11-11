@@ -43,8 +43,8 @@ async function applyPreset(ctx: PanelContext, host: Host, preset: TransitionPres
   const ns = 'transitions' as any;
   const info = await ctx.callHost<any>(ns, 'cutInfo');
   if (!info.ok) throw new Error(info.error);
-  const plan = buildTransition(preset, host);
   const frame = { fps: info.data.fps, width: info.data.width, height: info.data.height };
+  const plan = buildTransition(preset, host, frame);
   const compiled = host === 'ae' ? compileForAe(plan, frame) : compileForPpro(plan, frame);
   const r = await ctx.callHost<any>(ns, 'apply', { plan: compiled, cut: info.data.cut, ...(keyTime ? { keyTime } : {}) });
   if (!r.ok) throw new Error(r.error);
@@ -56,8 +56,8 @@ function fmtTime(s: number) { const m = Math.floor(s / 60); return `${m}:${(s - 
 export const transitionsModule: PanelModule = {
   id: 'transitions',
   catalog: [
-    { id: 'transitions', app: 'PPRO', cat: 'gfx', title: 'Geçişler', desc: 'Zoom, whip, glitch, dalga, ışık, bulanık; güç ve süre ayarlı', status: 'beta', preview: 'transition', view: 'v-trP', keys: 'geçiş transition zoom whip glitch ışık blur', feature: 'F-TR-01' },
-    { id: 'transitions-ae', app: 'AEFT', cat: 'gfx', title: 'Geçişler', desc: 'Kamera, glitch, ışık, flaş; düzenlenebilir ayar katmanları', status: 'beta', preview: 'transition', view: 'v-trA', keys: 'geçiş transition zoom whip spin glitch flaş ışık blur', feature: 'F-TR-01' },
+    { id: 'transitions', app: 'PPRO', cat: 'gfx', title: 'Geçişler', desc: 'Zoom, whip, dönüş, glitch, ışık, flaş, daire, film yanığı; güç ve süre ayarlı', status: 'beta', preview: 'transition', view: 'v-trP', keys: 'geçiş transition zoom whip spin dönüş glitch ışık flaş daire film blur', feature: 'F-TR-01' },
+    { id: 'transitions-ae', app: 'AEFT', cat: 'gfx', title: 'Geçişler', desc: 'Kamera, glitch, ışık, şekil, film; düzenlenebilir katmanlar', status: 'beta', preview: 'transition', view: 'v-trA', keys: 'geçiş transition zoom whip spin dönüş glitch flaş ışık daire film blur', feature: 'F-TR-01' },
   ],
   viewsHtml: view('PPRO') + view('AEFT'),
   jsx: [],
@@ -75,6 +75,7 @@ export const transitionsModule: PanelModule = {
       dir.innerHTML = (def.directions ?? []).map(d => `<option value="${d}">${DIR_LABEL[d]}</option>`).join('');
       ctx.$(`${p}DirL`).style.display = def.directions ? '' : 'none';
       ctx.$(`${p}ColL`).style.display = def.usesColor ? '' : 'none';
+      if (def.defaultColor) ctx.$<HTMLInputElement>(`${p}Col`).value = def.defaultColor;
       ctx.$(`${p}SeedL`).style.display = def.id === 'glitch' ? '' : 'none';
       ctx.$(`${p}Desc`).textContent = def.desc.tr;
     };
