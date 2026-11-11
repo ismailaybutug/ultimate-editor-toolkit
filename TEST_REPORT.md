@@ -29,6 +29,7 @@ A feature is "verified" only with H results recorded here, including app version
 | Subtitle engine tests (PR #4: fillers, styles/exporters, installer vs local HTTP server, ffmpeg+libass overlay alpha) + macOS CI `e2e` (clean runner installs whisper via the Engine and transcribes Turkish `say` speech) | U/G + CI | pass (suite total 132) |
 | `tests/library.test.ts` (preset slug/migration/folder safety; save/list/update/unique ids/trash/export/import/broken files) | U | 5/5 pass (suite total 137) |
 | Reframe on mock DOM (fill 1.778 / fit 0.563, keyed scale skipped) in `tests/host-ppro-tools.test.ts` | G | 2/2 pass (suite total 139) |
+| Transitions v2 tests (PR #6) | U/G | pass (suite total 151) |
 | ES3 syntax check of both `.jsx` files | G | pass |
 | Panel loads in headless Chromium, no JS errors | G | pass |
 | H-B1 Premiere 2026: panel 0.1.2 installs (Remote Control ran install-mac.sh with İso's approval), opens via Window > Extensions, and works (İso, 2026-11-10 11:45 UTC: "çalışıyor"; exact button tested not reported, assumed ping) | H | **pass (partial, İso's word only)** |

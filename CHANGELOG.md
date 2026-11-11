@@ -5,6 +5,7 @@
 - Added monorepo (pnpm, TypeScript, Vitest, esbuild), `@uet/core`, `@uet/engine`, AE and Premiere ExtendScript
   libraries, one CEP panel for both apps (Turkish UI), Mac installer and Turkish H-test guide.
 - Added MCP stdio server (`mcp.mjs`) so Claude Desktop can drive the panel tools (silence cut, AE recipes).
+- Merged transitions v2 (PR #6): 11 transitions, all in both apps.
 - Added Reframe (Dikey Format) for Premiere: 9:16 / 1:1 / 4:5 / 16:9 copy of the sequence.
 - Added preset library v1: save/apply/delete settings on every tool, folders, trash, .uetpack import/export (also as MCP tools).
 - Added GitHub Actions CI.
