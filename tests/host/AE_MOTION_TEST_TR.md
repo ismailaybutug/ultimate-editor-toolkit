@@ -46,4 +46,23 @@ Bir de dikdörtgen shape katmanı ekle.
 2. O katmanı hareket ettir (ya da konumuna animasyon ver): callout da onunla gitmeli.
 3. Hiçbir şey seçmeden "Ok" ve 4 farklı yönü dene: okun ucu ortaya bakmalı.
 
+## H. Katman Animasyonu (30+ hareket)
+1. Shape katmanını seç. Tür "Giriş" → "Yukarıdan düş" → Uygula: katman yukarıdan gelip hafifçe sekerek yerine oturmalı.
+2. "Vurgu" → "Zıpla" ve "Jöle" (oynatma kafasında), "Çıkış" → "Dönerek git" (katmanın sonunda) dene.
+3. Katmanı başka bir yere taşıyıp tekrar uygula: hareket katmanın yeni yerine göre olmalı.
+
+## I. Glow
+1. Bir metin katmanına "Yumuşak parlama", sonra "Neon (renkli)" uygula: ikincisi birincinin yerine geçmeli, renkli parlamalı.
+2. "Derin parlama (3 kat)": Effect Controls'ta "UET Glow 1/2/3" olmalı. "Glow'u kaldır" → hepsi silinmeli.
+
+## J. Arka Planlar
+1. Açık bir kompozisyonda "Akan renk geçişi" + "Kuzey ışıkları" → oluştur. Proje panelinde "UET BG ..." kompozisyonu olmalı,
+   açık kompozisyonun en altına eklenmeli ve sonuna kadar dönmeli. Döngünün başında/sonunda zıplama olmamalı.
+2. "Yüzen ışık topları" + "Dikey 1080x1920" dene.
+
+## K. Harita Rotası
+1. Herhangi bir harita görselini kompozisyona koy. Üç şehrin üstüne 3 null (Layer → New → Null Object) yerleştir, isimlerini şehir yap.
+2. Üç null'ı rota sırasıyla (Cmd basılı) seç → Rotayı çiz. Kavisli, kesikli bir çizgi çizilmeli; çizgi şehre varınca nokta belirmeli;
+   ok çizginin ucunda yön değiştirerek ilerlemeli.
+
 Son olarak: After Effects sürümünü (Yardım → Hakkında) yaz.

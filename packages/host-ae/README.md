@@ -4,6 +4,7 @@
 - `jsx/uet-ae-motion.jsx` — text animator presets, shake, counter, 3D carousel; defines `UET.aeKit` helpers.
 - `jsx/uet-ae-layout.jsx` — anchor point, align, distribute, sequence (needs `UET.aeKit`).
 - `jsx/uet-ae-gfx.jsx` — parametric titles and callouts/arrows (needs `UET.aeKit`, incl. `addTextAnimator`).
+- `jsx/uet-ae-fx.jsx` — glow passes, looping backgrounds, map routes (needs `UET.aeKit`). Layer animations use base `applyRecipe`.
 
 The motion/layout files are owned by the "Build After Effects animation tools" thread. Pure logic is in
 `packages/core/src/motion/` (not exported from `@uet/core` yet; imported by path). Panel UI + MCP tools:
@@ -22,3 +23,9 @@ The motion/layout files are owned by the "Build After Effects animation tools" t
   colours as `[r,g,b,1]`, Trim End, group `ADBE Vector Transform Group` Anchor/Position/Scale; `new Shape()` for paths.
 - Titles: `td.fauxBold` (wrapped in try), `layer.moveAfter`, box expressions using `sourceRectAtTime` + `toComp([0,0])`.
 - Callouts: label is parented to the callout layer and positioned in its local space (shape layer anchor is 0,0).
+- Glow uses param match names `ADBE Glo2-0002` threshold, `-0003` radius, `-0004` intensity, `-0007` glow colours
+  (2 = A & B), `-0012`/`-0013` colour A/B. 4-Color Gradient `ADBE 4ColorGradient-0001..0008` (point, colour pairs).
+  Gaussian Blur `ADBE Gaussian Blur 2-0001` blurriness, `-0003` repeat edge pixels. Noise `ADBE Noise-0001` amount.
+- Backgrounds: `app.project.items.addComp`, `layers.addSolid`, `layers.add(comp)` + `moveToEnd`, Time Remap `loopOut("cycle")`.
+- Routes: Shape with `inTangents/outTangents`, stroke dashes `ADBE Vector Stroke Dashes` > `ADBE Vector Stroke Dash 1`
+  (failure is reported as a warning), traveller expressions `pointOnPath` / `tangentOnPath` (AE 2020+).
