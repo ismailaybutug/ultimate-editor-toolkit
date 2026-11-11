@@ -1,0 +1,28 @@
+name: ci
+on:
+  push:
+    branches: [main, phase-2-foundation]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install ffmpeg (engine tests use real ffmpeg)
+        run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck, ES3 check, tests, build
+        run: pnpm check
+      - uses: actions/upload-artifact@v4
+        with:
+          name: com.uet.toolkit
+          path: dist/com.uet.toolkit
+          retention-days: 14

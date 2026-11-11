@@ -152,8 +152,79 @@ function openView(it: CatalogItem) {
     (h.querySelector('.back') as HTMLElement).onclick = closeView;
     v.prepend(h);
   }
+  if (!v.querySelector('.presets')) mountPresetBar(v, it);
+  else void refreshPresets(v, it);
   v.classList.add('on');
   $('main').scrollTop = 0;
+}
+
+// ---------- Presets: save / apply the current settings of any tool view ----------
+function viewFields(v: HTMLElement) {
+  return Array.from(v.querySelectorAll<HTMLInputElement | HTMLSelectElement>('input[id], select[id]'))
+    .filter(el => !el.closest('.presets'));
+}
+function readView(v: HTMLElement): Record<string, string | number | boolean | null> {
+  const out: Record<string, string | number | boolean | null> = {};
+  for (const el of viewFields(v)) {
+    if (el instanceof HTMLInputElement && el.type === 'checkbox') out[el.id] = el.checked;
+    else if (el instanceof HTMLInputElement && el.type === 'number') out[el.id] = el.value === '' ? null : Number(el.value);
+    else out[el.id] = el.value;
+  }
+  return out;
+}
+function writeView(v: HTMLElement, params: Record<string, unknown>) {
+  for (const el of viewFields(v)) {
+    if (!(el.id in params)) continue;
+    const val = params[el.id];
+    if (el instanceof HTMLInputElement && el.type === 'checkbox') el.checked = !!val;
+    else el.value = val === null || val === undefined ? '' : String(val);
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+}
+async function refreshPresets(v: HTMLElement, it: CatalogItem) {
+  const sel = v.querySelector<HTMLSelectElement>('.presets select');
+  if (!sel || !engine) return;
+  try {
+    const r = await engine.call('library.list', { tool: it.view, app: it.app });
+    sel.innerHTML = '<option value="">Preset seç…</option>' + r.presets.map((p: any) => `<option value="${p.id}">${p.folder ? p.folder + ' / ' : ''}${p.name.replace(/</g, '&lt;')}</option>`).join('');
+    (sel as any)._presets = r.presets;
+  } catch (e) { log(`Presetler okunamadı: ${(e as Error).message}`, 'err'); }
+}
+function mountPresetBar(v: HTMLElement, it: CatalogItem) {
+  if (!viewFields(v).length) return;
+  const bar = document.createElement('div');
+  bar.className = 'presets';
+  bar.innerHTML = '<select title="Kayıtlı ayarlar"></select><button class="mini" data-a="save" title="Bu ayarları preset olarak kaydet">Kaydet</button><button class="mini" data-a="del" title="Seçili preseti sil (çöp kutusuna)">Sil</button>';
+  v.querySelector('.vhead')!.after(bar);
+  const sel = bar.querySelector('select')!;
+  sel.onchange = () => {
+    const p = ((sel as any)._presets ?? []).find((x: any) => x.id === sel.value);
+    if (p) { writeView(v, p.params); log(`"${p.name}" ayarları yüklendi.`, 'ok'); }
+  };
+  (bar.querySelector('[data-a=save]') as HTMLButtonElement).onclick = () => {
+    if (!engine) { log('Motor çalışmıyor; preset kaydedilemez.', 'err'); return; }
+    if (bar.querySelector('input')) return;
+    const inp = document.createElement('input');
+    inp.placeholder = 'Preset adı, Enter ile kaydet';
+    sel.style.display = 'none';
+    bar.prepend(inp); inp.focus();
+    const done = () => { inp.remove(); sel.style.display = ''; };
+    inp.onkeydown = async e => {
+      if (e.key === 'Escape') done();
+      if (e.key !== 'Enter' || !inp.value.trim()) return;
+      try {
+        const p = await engine!.call('library.save', { name: inp.value.trim(), app: it.app, tool: it.view, params: readView(v) });
+        log(`Preset kaydedildi: ${p.name}`, 'ok');
+        done(); await refreshPresets(v, it); sel.value = p.id;
+      } catch (err) { log((err as Error).message, 'err'); }
+    };
+  };
+  (bar.querySelector('[data-a=del]') as HTMLButtonElement).onclick = async () => {
+    if (!engine || !sel.value) return;
+    try { await engine.call('library.delete', { id: sel.value }); log('Preset çöp kutusuna taşındı (~/.uet/library/.trash).', 'ok'); await refreshPresets(v, it); }
+    catch (err) { log((err as Error).message, 'err'); }
+  };
+  void refreshPresets(v, it);
 }
 
 function closeView() {

@@ -1,10 +1,11 @@
 import { z } from 'zod';
 import { ToolRegistry, planSilenceCut, everyNth } from '@uet/core';
+import { registerLibraryTools } from './library.js';
 import { detectSilence, measureLoudness, loudnessGain, detectScenes, detectBeats } from './analysis.js';
 import { findWhisper, findModel, modelDir } from './whisper.js';
 import { registerSubtitleTools } from './stt-tools.js';
 
-export const VERSION = '0.1.8';
+export const VERSION = '0.1.9';
 
 export function createRegistry(): ToolRegistry {
   const reg = new ToolRegistry();
@@ -63,5 +64,6 @@ export function createRegistry(): ToolRegistry {
     run: async () => ({ version: VERSION, whisper: findWhisper(), whisperModel: findModel(), modelDir: modelDir() }),
   });
   registerSubtitleTools(reg);
+  registerLibraryTools(reg);
   return reg;
 }

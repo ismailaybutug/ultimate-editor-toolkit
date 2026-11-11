@@ -19,13 +19,13 @@ Priority: P0 blocking · P1 next · P2 later. Owner role in brackets (see AGENT_
 - [~] P1 T2-S4 Engine spike — server + ffmpeg analysis done; whisper.cpp + Mac benchmark open: (launch, WS handshake, ffmpeg, whisper.cpp benchmark on Apple Silicon). [perf]
 - [~] P2 Scene Detect + Beat Markers (Premiere) — code + tests done; H test pending. Beat tracker needs real-music evaluation (pop, EDM, acoustic).
 - [~] P1 UI shell v2 — first version built (card catalog `apps/panel/src/catalog.ts`, categories, search ⌘K, favourites, toast/status bar, CSS previews; planned tools shown as disabled "Yakında" cards, never faked). Screenshots sent to İso; waiting for feedback. Was: (İso 2026-11-10: "UmutcanFX was more advanced, this looks very basic"): dark pro theme, category cards, tool search, previews. Mock screenshot to İso first.
-- [ ] P1 Install whisper on İso's Mac (needs Homebrew, which needs İso's password) + model to ~/.uet/models.
+- [ ] P1 Whisper on İso's Mac: now via the Altyazı card's "Motoru kur" button (PR #4, no Homebrew). İso's ffmpeg has libass (checked 2026-11-11).
 - [~] P1 T2-S4b whisper.cpp transcription — code + tests done (`packages/engine/src/whisper.ts`, `packages/core/src/transcript.ts`); H test guide section D; record realtime factor in TEST_REPORT.
 - [~] P1 T2-S5 MCP spike — server done + automated test; Claude Desktop H test (guide section C) pending.
-- [~] P1 T2-06 Monorepo scaffold done; GitHub Actions CI open. [architect]
-- [~] P1 T2-07 Core models: Recipe, Tool, ranges done; Preset, StyleCard, MotionSpec, Journal open. [architect]
+- [x] P1 T2-06 Monorepo scaffold + GitHub Actions CI (`ci.yml`). [architect]
+- [~] P1 T2-07 Core models: Recipe, Tool, ranges, Preset done; StyleCard, MotionSpec, Journal open. [architect]
 - [ ] P1 T2-08 UI shell (palette, tabs, themes, TR/EN, review dialog). [UI]
-- [ ] P1 T2-09 Preset/library v1. [architect]
+- [~] P1 T2-09 Preset/library v1 — engine + panel preset bar done, H test pending; library browser view (cards per preset, import/export UI) open.
 - [~] P1 T2-10 Silence Cutter v0 (markers + rebuild) done, waiting for H test. [PR dev]
 - [~] P1 T2-11 5 recipes + speed ramp done, waiting for H test. [AE dev / motion]
 - [~] P1 T2-12 Dev folder + install-mac.sh done; signed ZXP open. [architect]

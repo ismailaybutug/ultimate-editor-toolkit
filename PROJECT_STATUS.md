@@ -27,7 +27,9 @@ yet → every host feature below is UNVERIFIED.**
 | Music Ducking (`ppro.duckMusic`/`unduckMusic`), F-AU-03 | Speech from the selected dialogue clip (silence map inverted) → `planDucking` → Volume Level keyframes on the music track; skips clips with existing keys; undo | U + mock-DOM tests pass; **unverified in Premiere** (keyframe time base, Level units 0 dB = 0.1778) |
 | AE Titles (F-MG-01) + Callouts/Arrows (F-MG-06) (PR #5, AE thread) | `uet-ae-gfx.jsx` in the ae-motion module; MCP `ae.title`, `ae.callout` | U/G tests pass; **unverified in AE** (guide sections F–G); in dev build 0.1.8 |
 | Subtitle engine v2 (PR #4, subtitle thread): in-panel whisper install (own Apple Silicon build from repo release, SHA-256 checked; model from Hugging Face), 6 caption styles, ASS/VTT/JSON export, styled overlay video, Filler Word Cleaner (F-SUB-01/02/03, F-AI-04 part) | `modules/subtitles.ts`, `engine/src/stt-*.ts`, `uet-ppro-subtitles.jsx` | U/G tests pass; macOS CI installed the engine on a clean Mac and transcribed Turkish speech; **unverified in Premiere** (caption import, overlay placement, filler markers/new sequence). Overlay needs ffmpeg with libass |
-| Dev build | `uet-panel-dev-0.1.8.zip` + `install-mac.sh` + Turkish test guide | Waiting for İso's Mac test |
+| Preset library v1 (T2-07/T2-09, F-PROD-05 base) | `core/src/preset.ts` (schema `uet.preset/1` + migration), `engine/src/library.ts` (~/.uet/library, folders, trash instead of delete, .uetpack import/export), MCP `library.*`; panel preset bar on every tool view (save/apply/delete current settings) | U tests pass; **unverified in Adobe** |
+| CI | `.github/workflows/ci.yml`: typecheck, ES3 check, tests (real ffmpeg), build, uploads the extension folder as an artifact | first run on push |
+| Dev build | `uet-panel-dev-0.1.9.zip` + `install-mac.sh` + Turkish test guide | Waiting for İso's Mac test |
 
 ## Blockers / waiting on İso
 1. Run the Mac test (`tests/host/PHASE2_MAC_TEST_TR.md`) and send results + Premiere/AE versions.
