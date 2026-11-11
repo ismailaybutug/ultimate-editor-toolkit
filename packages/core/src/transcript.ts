@@ -105,3 +105,4 @@ export function toSrt(captions: Caption[]): string {
 
 export * from './transcript-fillers.js';
 export * from './transcript-styles.js';
+export * from './transcript-extras.js';

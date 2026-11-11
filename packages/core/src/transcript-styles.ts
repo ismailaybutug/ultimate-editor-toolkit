@@ -32,11 +32,13 @@ export interface CaptionStyle {
   /** Short-form "few words at a time" captions. 0 = no limit. */
   maxWords: number;
   animation: CaptionAnimation;
+  /** Colour (and for 'stacked', enlarge on its own line) the key words passed to toAss. */
+  emphasis: 'none' | 'color' | 'stacked';
 }
 
 const base: Omit<CaptionStyle, 'id' | 'name'> = {
   font: 'Arial', size: 64, bold: true, uppercase: false, color: '#FFFFFF', highlight: '#FFD60A', outline: '#000000',
-  outlineWidth: 4, shadow: 0, box: null, x: 0.5, y: 0.86, maxLineChars: 32, maxLines: 2, maxWords: 0, animation: 'none',
+  outlineWidth: 4, shadow: 0, box: null, x: 0.5, y: 0.86, maxLineChars: 32, maxLines: 2, maxWords: 0, animation: 'none', emphasis: 'none',
 };
 
 export const CAPTION_STYLES: CaptionStyle[] = [
@@ -47,6 +49,9 @@ export const CAPTION_STYLES: CaptionStyle[] = [
   { ...base, id: 'highlight', name: { tr: 'Kelime Vurgusu', en: 'Word Highlight' }, font: 'Arial Black', size: 84, uppercase: true, outlineWidth: 6,
     y: 0.72, maxLineChars: 18, maxWords: 4, animation: 'highlight' },
   { ...base, id: 'karaoke', name: { tr: 'Karaoke', en: 'Karaoke' }, size: 70, outlineWidth: 5, highlight: '#00E5FF', animation: 'karaoke' },
+  { ...base, id: 'stacked', name: { tr: 'Katmanlı Vurgu', en: 'Stacked Emphasis' }, font: 'Arial Black', size: 64, uppercase: true, outlineWidth: 5,
+    shadow: 2, y: 0.72, maxLineChars: 18, maxWords: 6, animation: 'pop', emphasis: 'stacked' },
+  { ...base, id: 'keyword', name: { tr: 'Anahtar Kelime Renkli', en: 'Key-word Colour' }, size: 70, outlineWidth: 5, animation: 'fade', emphasis: 'color' },
   { ...base, id: 'reveal', name: { tr: 'Kelime Kelime', en: 'Word by Word' }, size: 76, outlineWidth: 5, y: 0.75, maxLineChars: 22, maxWords: 5, animation: 'reveal' },
 ];
 
@@ -110,7 +115,11 @@ function assTime(sec: number): string {
 }
 const assEscape = (t: string) => t.replace(/\\/g, '⧵').replace(/[{}]/g, m => (m === '{' ? '(' : ')'));
 
-export interface AssOptions { width: number; height: number }
+export interface AssOptions {
+  width: number; height: number;
+  /** Words to emphasise as "captionIndex:wordIndex" (see pickEmphasis). */
+  emphasis?: Set<string>;
+}
 
 /** ASS script that reproduces the style and animation. Times are as given (use timeline times for overlays). */
 export function toAss(captions: Caption[], style: CaptionStyle, o: AssOptions = { width: 1920, height: 1080 }): string {
@@ -135,19 +144,32 @@ export function toAss(captions: Caption[], style: CaptionStyle, o: AssOptions = 
     if (end - start >= 0.01) events.push(`Dialogue: 0,${assTime(start)},${assTime(end)},UET,,0,0,0,,{\\an2\\pos(${posX},${posY})${fsTag}}${text}`);
   };
   let fsTag = '';
-  for (const c of captions) {
+  captions.forEach((c, ci) => {
     const words = c.words.length ? c.words : [{ text: c.text, start: c.start, end: c.end, p: 1 } as Word];
-    const texts = words.map(w => assEscape(upper(w.text, style)));
-    const counts = splitLines(texts, style.maxLineChars, style.maxLines);
+    const isKey = (wi: number) => style.emphasis !== 'none' && !!o.emphasis?.has(`${ci}:${wi}`);
+    const texts = words.map((w, wi) => {
+      const t = assEscape(upper(w.text, style));
+      return isKey(wi) && style.emphasis === 'color' && style.animation !== 'highlight' && style.animation !== 'karaoke' ? `{\\c${hl}}${t}{\\c${base}}` : t;
+    });
+    const plain = words.map(w => upper(w.text, style));
+    const keyIdx = words.findIndex((_, wi) => isKey(wi));
+    // Stacked look: the key word gets its own, bigger line between the words before and after it.
+    const counts = style.emphasis === 'stacked' && keyIdx >= 0
+      ? [keyIdx, 1, words.length - keyIdx - 1].filter(n => n > 0)
+      : splitLines(plain, style.maxLineChars, style.maxLines);
     const lineEnds = new Set<number>(); // index of the last word of each line except the last
     counts.reduce((acc, n, li) => { if (li < counts.length - 1) lineEnds.add(acc + n - 1); return acc + n; }, 0);
     const join = (parts: string[]) => parts.map((p, k) => p + (k === parts.length - 1 ? '' : lineEnds.has(k) ? '\\N' : ' ')).join('');
     // Shrink the font for this caption when its longest line would not fit in 90% of the frame width.
     let longest = 0, cur = 0;
-    texts.forEach((t, k) => { cur += (cur ? 1 : 0) + t.length; if (lineEnds.has(k) || k === texts.length - 1) { longest = Math.max(longest, cur); cur = 0; } });
+    plain.forEach((t, k) => { cur += (cur ? 1 : 0) + t.length * (style.emphasis === 'stacked' && k === keyIdx ? 1.6 : 1); if (lineEnds.has(k) || k === texts.length - 1) { longest = Math.max(longest, cur); cur = 0; } });
     const charW = (style.uppercase || /black/i.test(style.font) ? 0.72 : 0.6) * (style.bold ? 1.05 : 1);
     const fit = Math.floor((0.9 * o.width) / Math.max(1, longest * charW));
     fsTag = fit < size ? `\\fs${fit}` : '';
+    if (style.emphasis === 'stacked' && keyIdx >= 0) {
+      const eff = Math.min(size, fit);
+      texts[keyIdx] = `{\\c${hl}\\fs${Math.round(eff * 1.6)}}${texts[keyIdx]}{\\c${base}\\fs${eff}}`;
+    }
     switch (style.animation) {
       case 'none': ev(c.start, c.end, join(texts)); break;
       case 'fade': ev(c.start, c.end, `{\\fad(120,120)}${join(texts)}`); break;
@@ -173,7 +195,7 @@ export function toAss(captions: Caption[], style: CaptionStyle, o: AssOptions = 
         });
         break;
     }
-  }
+  });
   return [...header, ...events].join('\n') + '\n';
 }
 

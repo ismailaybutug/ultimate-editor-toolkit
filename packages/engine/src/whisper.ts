@@ -48,7 +48,9 @@ export const VERBATIM_PROMPT: Record<string, string> = {
   en: 'Umm, uh, so, like... you know, hmm. Uh, I mean.',
 };
 
-export interface TranscribeOptions { language?: string; model?: string; threads?: number; translate?: boolean; verbatim?: boolean; noCache?: boolean }
+export interface TranscribeOptions { language?: string; model?: string; threads?: number; translate?: boolean; verbatim?: boolean; noCache?: boolean;
+  /** Extra initial prompt, e.g. correct spellings of names (corrections list). */
+  prompt?: string }
 export interface TranscribeResult {
   language: string | null; segments: Segment[]; model: string; cached: boolean; gpu: boolean;
   timing: { audioSeconds: number; elapsedSeconds: number; realtimeFactor: number };
@@ -61,7 +63,7 @@ export function currentJob(): SttJob | null { return job ? { ...job } : null; }
 
 function cacheKey(file: string, model: string, o: TranscribeOptions): string {
   const st = statSync(file);
-  return createHash('sha1').update(JSON.stringify([file, st.size, st.mtimeMs, model, o.language ?? 'auto', !!o.translate, !!o.verbatim, 2])).digest('hex');
+  return createHash('sha1').update(JSON.stringify([file, st.size, st.mtimeMs, model, o.language ?? 'auto', !!o.translate, !!o.verbatim, o.prompt ?? '', 2])).digest('hex');
 }
 
 function runWhisper(bin: string, args: string[], onPercent: (p: number) => void): Promise<{ code: number; stderr: string }> {
@@ -106,7 +108,8 @@ export async function transcribe(file: string, o: TranscribeOptions = {}): Promi
     const args = ['-m', model, '-f', wav, '-l', lang, '-ojf', '-of', base, '-np', '-pp',
       '-t', String(o.threads ?? Math.max(1, Math.min(8, cpus().length - 1)))];
     if (o.translate) args.push('-tr');
-    if (o.verbatim) args.push('--prompt', VERBATIM_PROMPT[lang] ?? VERBATIM_PROMPT.en!);
+    const prompt = [o.verbatim ? (VERBATIM_PROMPT[lang] ?? VERBATIM_PROMPT.en!) : '', o.prompt ?? ''].filter(Boolean).join(' ');
+    if (prompt) args.push('--prompt', prompt);
     const t0 = Date.now();
     let gpu = true;
     let r = await runWhisper(bin, args, p => { if (job) job.percent = p; });
