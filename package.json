@@ -1,0 +1,27 @@
+{
+  "name": "ultimate-editor-toolkit",
+  "private": true,
+  "version": "0.1.9",
+  "type": "module",
+  "packageManager": "pnpm@10.28.0",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "lint:jsx": "node tools/check-es3.mjs",
+    "build": "node tools/build.mjs",
+    "check": "pnpm typecheck && pnpm lint:jsx && pnpm test && pnpm build"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/ws": "^8.5.13",
+    "acorn": "^8.14.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
+  },
+  "dependencies": {
+    "ws": "^8.18.0",
+    "zod": "^3.24.0",
+    "zod-to-json-schema": "^3.25.2"
+  }
+}

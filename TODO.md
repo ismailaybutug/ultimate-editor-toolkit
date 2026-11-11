@@ -3,24 +3,29 @@
 Priority: P0 blocking · P1 next · P2 later. Owner role in brackets (see AGENT_HANDOFF.md).
 
 ## Phase 0–1 follow-ups
-- [ ] P0 T0-01 İso approves Phase 0–1 docs and TD-001…TD-013. [İso]
-- [ ] P0 T0-02 Fix GitHub push access (collaborator or reconnect) and push docs. [İso → orchestrator]
+- [x] T0-01 Phase 0–1 approved by İso (2026-11-10).
+- [x] T0-02 Push access fixed; docs on main (2026-11-10).
 - [x] T0-03 TD-012 decided: downloader cancelled (2026-11-10).
 - [ ] P1 T0-04 Watch UmutcanFX public demo videos / blog / preview lessons; add any missing features and
       confirm which panel owns each tool (rows marked "inferred"). [architect]
 - [ ] P2 T0-05 Optional: code-level audit of Creative Universe source if İso uploads `creative-universe/source`. [architect]
 - [ ] P1 T0-06 Record AE version on İso's Mac. [İso]
 
-## Phase 2 (after approval) — depends on T0-01
-- [ ] P1 T2-S1 AE CEP spike (comp + text + eased keyframes, one undo group). [AE dev]
-- [ ] P1 T2-S2 Premiere CEP spike (markers, rebuild-from-ranges, QE razor, QE setSpeed on 26.5.x). [PR dev]
+## Phase 2 — in progress (branch phase-2-foundation)
+- [ ] P0 T2-H1 İso runs tests/host/PHASE2_MAC_TEST_TR.md on his Mac; record results. [İso → QA]
+- [~] P1 T2-S1 AE CEP spike — code done, waiting for H test: (comp + text + eased keyframes, one undo group). [AE dev]
+- [~] P1 T2-S2 Premiere CEP spike — code done (razor/setSpeed only probed), waiting for H test: (markers, rebuild-from-ranges, QE razor, QE setSpeed on 26.5.x). [PR dev]
 - [ ] P1 T2-S3 Premiere UXP spike (same ops). [PR dev]
-- [ ] P1 T2-S4 Engine spike (launch, WS handshake, ffmpeg, whisper.cpp benchmark on Apple Silicon). [perf]
-- [ ] P1 T2-S5 MCP spike (Claude Desktop → Engine tool → timeline change). [AI eng]
-- [ ] P1 T2-06 Monorepo scaffold + CI. [architect]
-- [ ] P1 T2-07 Core models + schemas. [architect]
+- [~] P1 T2-S4 Engine spike — server + ffmpeg analysis done; whisper.cpp + Mac benchmark open: (launch, WS handshake, ffmpeg, whisper.cpp benchmark on Apple Silicon). [perf]
+- [~] P2 Scene Detect + Beat Markers (Premiere) — code + tests done; H test pending. Beat tracker needs real-music evaluation (pop, EDM, acoustic).
+- [~] P1 UI shell v2 — first version built (card catalog `apps/panel/src/catalog.ts`, categories, search ⌘K, favourites, toast/status bar, CSS previews; planned tools shown as disabled "Yakında" cards, never faked). Screenshots sent to İso; waiting for feedback. Was: (İso 2026-11-10: "UmutcanFX was more advanced, this looks very basic"): dark pro theme, category cards, tool search, previews. Mock screenshot to İso first.
+- [ ] P1 Whisper on İso's Mac: now via the Altyazı card's "Motoru kur" button (PR #4, no Homebrew). İso's ffmpeg has libass (checked 2026-11-11).
+- [~] P1 T2-S4b whisper.cpp transcription — code + tests done (`packages/engine/src/whisper.ts`, `packages/core/src/transcript.ts`); H test guide section D; record realtime factor in TEST_REPORT.
+- [~] P1 T2-S5 MCP spike — server done + automated test; Claude Desktop H test (guide section C) pending.
+- [x] P1 T2-06 Monorepo scaffold + GitHub Actions CI (`ci.yml`). [architect]
+- [~] P1 T2-07 Core models: Recipe, Tool, ranges, Preset done; StyleCard, MotionSpec, Journal open. [architect]
 - [ ] P1 T2-08 UI shell (palette, tabs, themes, TR/EN, review dialog). [UI]
-- [ ] P1 T2-09 Preset/library v1. [architect]
-- [ ] P1 T2-10 Silence Cutter end-to-end (Premiere). [PR dev]
-- [ ] P1 T2-11 Layer animation recipes + speed ramp (AE). [AE dev / motion]
-- [ ] P1 T2-12 Packaging: dev ZXP + install instructions for İso. [architect]
+- [~] P1 T2-09 Preset/library v1 — engine + panel preset bar done, H test pending; library browser view (cards per preset, import/export UI) open.
+- [~] P1 T2-10 Silence Cutter v0 (markers + rebuild) done, waiting for H test. [PR dev]
+- [~] P1 T2-11 5 recipes + speed ramp done, waiting for H test. [AE dev / motion]
+- [~] P1 T2-12 Dev folder + install-mac.sh done; signed ZXP open. [architect]

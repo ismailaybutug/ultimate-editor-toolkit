@@ -1,0 +1,616 @@
+// Panel UI for Premiere Pro and After Effects (CEP). Kept dependency-free for the Phase 2 spike.
+import { BUILTIN_RECIPES, retimeRecipe, buildRampKeyframes, segmentsFromCuts, planDucking, invertRanges } from '@uet/core';
+import { z } from 'zod';
+import { CATALOG, CATEGORIES, STATUS_LABEL, type CatalogItem, type App } from './catalog';
+import { MODULES } from './modules/index';
+import type { PanelContext } from './modules/types';
+
+declare global {
+  interface Window {
+    __adobe_cep__?: { evalScript(script: string, cb: (r: string) => void): void; getHostEnvironment(): string; getSystemPath(t: string): string };
+    require?: (m: string) => any;
+  }
+}
+
+type HostResult<T = any> = { ok: true; data: T } | { ok: false; error: string; line?: number };
+
+const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
+const logEl = $('log');
+let toastTimer: any;
+function log(msg: string, kind: 'ok' | 'err' | '' = '') {
+  const line = document.createElement('div');
+  if (kind) line.className = kind + 'c';
+  line.textContent = `${new Date().toLocaleTimeString()}  ${msg}`;
+  logEl.prepend(line);
+  $('status').textContent = msg.length > 70 ? msg.slice(0, 70) + '…' : msg;
+  const t = $('toast');
+  t.textContent = msg; t.className = `show ${kind ? kind + 'c' : ''}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.className = ''; }, kind === 'err' ? 9000 : 5000);
+}
+
+const cep = window.__adobe_cep__;
+const hostApp: 'PPRO' | 'AEFT' | 'BROWSER' = cep ? JSON.parse(cep.getHostEnvironment()).appName : 'BROWSER';
+// Browser preview (no Adobe): ?app=AEFT shows the After Effects catalog.
+const previewApp = new URLSearchParams(location.search).get('app') === 'AEFT' ? 'AEFT' : 'PPRO';
+
+function extensionPath(): string {
+  if (!cep) return '.';
+  let p = decodeURIComponent(cep.getSystemPath('extension'));
+  p = p.replace(/^file:\/\/\/?/, navigator.platform.startsWith('Win') ? '' : '/');
+  return p;
+}
+
+function evalHost<T>(script: string): Promise<HostResult<T>> {
+  return new Promise(resolve => {
+    if (!cep) { resolve({ ok: false, error: 'Not running inside Adobe app' }); return; }
+    cep.evalScript(script, raw => {
+      try { resolve(JSON.parse(raw)); }
+      catch { resolve({ ok: false, error: `Host returned: ${raw}` }); }
+    });
+  });
+}
+
+/** Call UET.<ns>.<fn>(JSON) in the host. Arguments are passed as a quoted JSON string. */
+function callHost<T>(ns: 'ae' | 'ppro', fn: string, args?: unknown): Promise<HostResult<T>> {
+  const arg = args === undefined ? '' : JSON.stringify(JSON.stringify(args));
+  return evalHost<T>(`UET.${ns}.${fn}(${arg})`);
+}
+
+async function loadHostLibrary() {
+  const file = hostApp === 'AEFT' ? 'uet-ae.jsx' : 'uet-ppro.jsx';
+  const path = `${extensionPath()}/jsx/${file}`.replace(/\\/g, '/');
+  await new Promise<void>(r => cep?.evalScript(`$.evalFile(${JSON.stringify(path)})`, () => r()));
+}
+
+// ---------- Engine (runs inside the panel's Node context) ----------
+let engine: { call(id: string, params: unknown): Promise<any> } | null = null;
+async function startEngine() {
+  const el = $('engine');
+  try {
+    if (!window.require) throw new Error('Node.js is not enabled in this panel');
+    const mod = window.require(`${extensionPath()}/engine.cjs`);
+    const reg = mod.createRegistry();
+    registerHostTools(reg);
+    engine = { call: (id, p) => reg.call(id, p) };
+    const info = await engine.call('engine.ping', {});
+    try { await mod.startServer(reg, {}); } catch { /* another engine may already listen; direct calls still work */ }
+    el.innerHTML = `<i></i>motor ${info.version}`;
+    el.className = 'pill okc';
+    el.title = 'Yerel motor çalışıyor';
+  } catch (e) {
+    el.innerHTML = '<i></i>motor kapalı';
+    el.className = 'pill errc';
+    log(`Motor başlatılamadı: ${(e as Error).message}`, 'err');
+  }
+}
+
+// ---------- Shell: cards, categories, search, tool views ----------
+const PREVIEW: Record<string, string> = {
+  wave: '<div class="bars">' + [6,14,22,18,9,0,0,0,12,26,20,8,0,0,16,24,10].map((h, i) => h ? `<span style="height:${h}px;animation-delay:${i * 0.07}s"></span>` : '<span class="gap"></span>').join('') + '</div>',
+  meter: '<div class="meter"></div>',
+  captions: '<div class="cap">Merhaba <em>arkadaşlar</em></div>',
+  pop: '<div class="box"></div>',
+  ramp: '<svg class="curve" viewBox="0 0 100 40" preserveAspectRatio="none"><path d="M0 34 C 25 34, 30 6, 50 6 S 75 34, 100 34"/></svg>',
+  title: '<div class="title"><i></i><i></i></div>',
+  transition: '<div class="wipe"></div>',
+  grid: '<div class="cells">' + '<i></i>'.repeat(8) + '</div>',
+  spark: '<div class="spark">' + [[18,30],[40,14],[62,34],[80,18],[50,26]].map(([x, y], i) => `<i style="left:${x}%;top:${y}px;animation-delay:${i * 0.4}s"></i>`).join('') + '</div>',
+  dev: '<div class="code">ping → ok</div>',
+};
+const FAV_KEY = 'uet.favs';
+const favs = new Set<string>(JSON.parse(localStorage.getItem(FAV_KEY) ?? '[]'));
+let activeCat = 'all';
+
+function shellApp(): App { return hostApp === 'BROWSER' ? previewApp : hostApp === 'AEFT' ? 'AEFT' : 'PPRO'; }
+function catColor(app: App, cat: string) { return CATEGORIES[app].find(c => c.id === cat)?.color ?? '#9aa4b2'; }
+
+function cardHtml(it: CatalogItem): string {
+  const c = catColor(it.app, it.cat);
+  const fav = favs.has(it.app + it.id);
+  return `<button class="card ${it.status}" data-id="${it.id}" style="--c:${c};--cg:${c}38" ${it.status === 'soon' ? 'title="Henüz yok, planlandı (' + (it.feature ?? '') + ')"' : ''}>
+    <div class="pv">${PREVIEW[it.preview] ?? ''}<span class="badge ${it.status}">${STATUS_LABEL[it.status]}</span>
+    ${it.status !== 'soon' ? `<span class="star ${fav ? 'on' : ''}" data-fav="${it.id}">★</span>` : ''}</div>
+    <div class="meta"><b>${it.title}</b><p>${it.desc}</p></div></button>`;
+}
+
+function renderHome() {
+  const app = shellApp();
+  const q = $<HTMLInputElement>('q').value.trim().toLocaleLowerCase('tr');
+  const items = CATALOG.filter(it => it.app === app)
+    .filter(it => activeCat === 'all' || (activeCat === 'fav' ? favs.has(it.app + it.id) : it.cat === activeCat))
+    .filter(it => !q || `${it.title} ${it.desc} ${it.keys ?? ''}`.toLocaleLowerCase('tr').includes(q));
+  const order = { beta: 0, dev: 2, soon: 1 } as const;
+  let html = '';
+  for (const cat of CATEGORIES[app]) {
+    const list = items.filter(i => i.cat === cat.id).sort((a, b) => order[a.status] - order[b.status]);
+    if (!list.length) continue;
+    html += `<div class="group" style="--c:${cat.color}">${cat.label}</div><div class="grid">${list.map(cardHtml).join('')}</div>`;
+  }
+  const home = $('home');
+  home.innerHTML = html || '<div class="empty">Sonuç yok. Başka bir kelime dene.</div>';
+  home.querySelectorAll<HTMLElement>('[data-fav]').forEach(s => s.onclick = e => {
+    e.stopPropagation();
+    const k = app + s.dataset.fav; favs.has(k) ? favs.delete(k) : favs.add(k);
+    localStorage.setItem(FAV_KEY, JSON.stringify([...favs])); renderHome();
+  });
+  home.querySelectorAll<HTMLElement>('.card').forEach(c => c.onclick = () => {
+    const it = CATALOG.find(x => x.app === app && x.id === c.dataset.id);
+    if (it?.view) openView(it);
+  });
+}
+
+function openView(it: CatalogItem) {
+  $('home').style.display = 'none';
+  $('chips').style.display = 'none';
+  document.querySelectorAll<HTMLElement>('.view').forEach(v => v.classList.remove('on'));
+  const v = $(it.view!);
+  if (!v.querySelector('.vhead')) {
+    const h = document.createElement('div');
+    h.className = 'vhead';
+    h.innerHTML = `<button class="back" title="Geri">←</button><b>${it.title}</b><span class="badge ${it.status}">${STATUS_LABEL[it.status]}</span>`;
+    (h.querySelector('.back') as HTMLElement).onclick = closeView;
+    v.prepend(h);
+  }
+  if (!v.querySelector('.presets')) mountPresetBar(v, it);
+  else void refreshPresets(v, it);
+  v.classList.add('on');
+  $('main').scrollTop = 0;
+}
+
+// ---------- Presets: save / apply the current settings of any tool view ----------
+function viewFields(v: HTMLElement) {
+  return Array.from(v.querySelectorAll<HTMLInputElement | HTMLSelectElement>('input[id], select[id]'))
+    .filter(el => !el.closest('.presets'));
+}
+function readView(v: HTMLElement): Record<string, string | number | boolean | null> {
+  const out: Record<string, string | number | boolean | null> = {};
+  for (const el of viewFields(v)) {
+    if (el instanceof HTMLInputElement && el.type === 'checkbox') out[el.id] = el.checked;
+    else if (el instanceof HTMLInputElement && el.type === 'number') out[el.id] = el.value === '' ? null : Number(el.value);
+    else out[el.id] = el.value;
+  }
+  return out;
+}
+function writeView(v: HTMLElement, params: Record<string, unknown>) {
+  for (const el of viewFields(v)) {
+    if (!(el.id in params)) continue;
+    const val = params[el.id];
+    if (el instanceof HTMLInputElement && el.type === 'checkbox') el.checked = !!val;
+    else el.value = val === null || val === undefined ? '' : String(val);
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+}
+async function refreshPresets(v: HTMLElement, it: CatalogItem) {
+  const sel = v.querySelector<HTMLSelectElement>('.presets select');
+  if (!sel || !engine) return;
+  try {
+    const r = await engine.call('library.list', { tool: it.view, app: it.app });
+    sel.innerHTML = '<option value="">Preset seç…</option>' + r.presets.map((p: any) => `<option value="${p.id}">${p.folder ? p.folder + ' / ' : ''}${p.name.replace(/</g, '&lt;')}</option>`).join('');
+    (sel as any)._presets = r.presets;
+  } catch (e) { log(`Presetler okunamadı: ${(e as Error).message}`, 'err'); }
+}
+function mountPresetBar(v: HTMLElement, it: CatalogItem) {
+  if (!viewFields(v).length) return;
+  const bar = document.createElement('div');
+  bar.className = 'presets';
+  bar.innerHTML = '<select title="Kayıtlı ayarlar"></select><button class="mini" data-a="save" title="Bu ayarları preset olarak kaydet">Kaydet</button><button class="mini" data-a="del" title="Seçili preseti sil (çöp kutusuna)">Sil</button>';
+  v.querySelector('.vhead')!.after(bar);
+  const sel = bar.querySelector('select')!;
+  sel.onchange = () => {
+    const p = ((sel as any)._presets ?? []).find((x: any) => x.id === sel.value);
+    if (p) { writeView(v, p.params); log(`"${p.name}" ayarları yüklendi.`, 'ok'); }
+  };
+  (bar.querySelector('[data-a=save]') as HTMLButtonElement).onclick = () => {
+    if (!engine) { log('Motor çalışmıyor; preset kaydedilemez.', 'err'); return; }
+    if (bar.querySelector('input')) return;
+    const inp = document.createElement('input');
+    inp.placeholder = 'Preset adı, Enter ile kaydet';
+    sel.style.display = 'none';
+    bar.prepend(inp); inp.focus();
+    const done = () => { inp.remove(); sel.style.display = ''; };
+    inp.onkeydown = async e => {
+      if (e.key === 'Escape') done();
+      if (e.key !== 'Enter' || !inp.value.trim()) return;
+      try {
+        const p = await engine!.call('library.save', { name: inp.value.trim(), app: it.app, tool: it.view, params: readView(v) });
+        log(`Preset kaydedildi: ${p.name}`, 'ok');
+        done(); await refreshPresets(v, it); sel.value = p.id;
+      } catch (err) { log((err as Error).message, 'err'); }
+    };
+  };
+  (bar.querySelector('[data-a=del]') as HTMLButtonElement).onclick = async () => {
+    if (!engine || !sel.value) return;
+    try { await engine.call('library.delete', { id: sel.value }); log('Preset çöp kutusuna taşındı (~/.uet/library/.trash).', 'ok'); await refreshPresets(v, it); }
+    catch (err) { log((err as Error).message, 'err'); }
+  };
+  void refreshPresets(v, it);
+}
+
+function closeView() {
+  document.querySelectorAll<HTMLElement>('.view').forEach(v => v.classList.remove('on'));
+  $('home').style.display = '';
+  $('chips').style.display = '';
+}
+
+function mergeModules() {
+  const main = $('main');
+  for (const m of MODULES) {
+    for (const it of m.catalog) {
+      const i = CATALOG.findIndex(x => x.app === it.app && x.id === it.id);
+      if (i >= 0) CATALOG[i] = it; else CATALOG.push(it);
+    }
+    if (m.viewsHtml) main.insertAdjacentHTML('beforeend', m.viewsHtml);
+  }
+}
+
+function moduleContext(): PanelContext {
+  return {
+    hostApp, callHost: callHost as any, engine: () => engine, log, busy: busy as any, $,
+    loadJsx: async (rel: string) => { await evalHost(`$.evalFile(${JSON.stringify(extensionPath() + '/' + rel)})`); },
+  };
+}
+
+function setupShell() {
+  mergeModules();
+  const app = shellApp();
+  $('hostName').textContent = app === 'AEFT' ? 'After Effects' : 'Premiere Pro';
+  document.querySelectorAll<HTMLElement>('.view').forEach(v => { if (v.dataset.app !== app) v.remove(); });
+  const chips = $('chips');
+  const all = [{ id: 'all', label: 'Tümü', color: '#eceef3' }, { id: 'fav', label: '★ Favoriler', color: '#ffd166' }, ...CATEGORIES[app]];
+  chips.innerHTML = all.map(c => `<button class="chip ${c.id === activeCat ? 'on' : ''}" data-cat="${c.id}" style="--c:${c.color}">${c.label}</button>`).join('');
+  chips.querySelectorAll<HTMLElement>('.chip').forEach(b => b.onclick = () => {
+    activeCat = b.dataset.cat!;
+    chips.querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x === b));
+    renderHome();
+  });
+  const q = $<HTMLInputElement>('q');
+  q.oninput = () => { closeView(); renderHome(); };
+  q.onkeydown = e => {
+    if (e.key === 'Enter') { const first = document.querySelector<HTMLElement>('.card.beta, .card.dev'); first?.click(); }
+    if (e.key === 'Escape') { q.value = ''; renderHome(); }
+  };
+  document.addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); q.focus(); q.select(); }
+    if (e.key === 'Escape' && document.activeElement !== q) closeView();
+  });
+  $('logToggle').onclick = () => $('log').classList.toggle('open');
+  renderHome();
+}
+
+function busy<T>(btn: HTMLButtonElement, fn: () => Promise<T>) {
+  return async () => {
+    btn.disabled = true;
+    try { await fn(); } catch (e) { log((e as Error).message, 'err'); } finally { btn.disabled = false; }
+  };
+}
+
+function report(r: HostResult, okMsg: (d: any) => string) {
+  if (r.ok) log(okMsg(r.data), 'ok'); else log(`Hata: ${r.error}${r.line ? ` (satır ${r.line})` : ''}`, 'err');
+}
+
+// ---------- Premiere ----------
+let lastPlan: { keep: { start: number; end: number }[]; cut: { start: number; end: number }[] } | null = null;
+
+// ---------- Shared actions (used by buttons AND by MCP tools) ----------
+async function cutSilences(p: { minSilence: number; padding: number; thresholdDb?: number; mode: 'analyze' | 'markers' | 'newSequence' }) {
+  if (!engine) throw new Error('Engine not running');
+  const info = await callHost<any>('ppro', 'getSelectedClipInfo');
+  if (!info.ok) throw new Error(info.error);
+  const plan = await engine.call('audio.planSilenceCut', { file: info.data.mediaPath, minSilence: p.minSilence, padding: p.padding, thresholdDb: p.thresholdDb, fps: info.data.sequenceFps });
+  lastPlan = plan;
+  const summary = { clip: info.data.name, noiseFloorDb: plan.noiseFloorDb, thresholdDb: plan.thresholdDb, cuts: plan.cut.length, removedSeconds: plan.removedSeconds };
+  if (p.mode === 'markers') {
+    const r = await callHost<any>('ppro', 'addMarkers', { ranges: plan.cut, name: 'UET sessizlik', useSelection: true });
+    if (!r.ok) throw new Error(r.error);
+    return { ...summary, markers: r.data.markers };
+  }
+  if (p.mode === 'newSequence') {
+    const r = await callHost<any>('ppro', 'buildFromRanges', { keep: plan.keep });
+    if (!r.ok) throw new Error(r.error);
+    return { ...summary, newSequence: r.data.sequence, originalUnchanged: r.data.original };
+  }
+  return summary;
+}
+
+async function detectScenesAction(p: { threshold: number; mode: 'analyze' | 'markers' | 'newSequence' }) {
+  if (!engine) throw new Error('Engine not running');
+  const info = await callHost<any>('ppro', 'getSelectedClipInfo');
+  if (!info.ok) throw new Error(info.error);
+  const d = info.data;
+  const r = await engine.call('video.detectScenes', { file: d.mediaPath, threshold: p.threshold });
+  const cuts: number[] = r.scenes.filter((t: number) => t > d.sourceIn && t < d.sourceOut);
+  const out: any = { clip: d.name, scenes: cuts.length };
+  if (p.mode === 'markers' && cuts.length) {
+    const m = await callHost<any>('ppro', 'addMarkers', { ranges: cuts.map(t => ({ start: t, end: t })), name: 'UET sahne', useSelection: true, colorIndex: 4 });
+    if (!m.ok) throw new Error(m.error);
+    out.markers = m.data.markers;
+  }
+  if (p.mode === 'newSequence' && cuts.length) {
+    const keep = segmentsFromCuts(cuts, d.sourceIn, d.sourceOut);
+    const b = await callHost<any>('ppro', 'buildFromRanges', { keep, name: `${d.sequence} - UET sahneler` });
+    if (!b.ok) throw new Error(b.error);
+    out.newSequence = b.data.sequence;
+  }
+  return out;
+}
+
+async function beatMarkersAction(p: { every: number }) {
+  if (!engine) throw new Error('Engine not running');
+  const info = await callHost<any>('ppro', 'getSelectedClipInfo');
+  if (!info.ok) throw new Error(info.error);
+  const d = info.data;
+  const r = await engine.call('audio.detectBeats', { file: d.mediaPath, every: p.every });
+  const beats: number[] = r.beats.filter((t: number) => t >= d.sourceIn && t < d.sourceOut);
+  const m = await callHost<any>('ppro', 'addMarkers', { ranges: beats.map(t => ({ start: t, end: t })), name: 'UET vuruş', useSelection: true, colorIndex: 2 });
+  if (!m.ok) throw new Error(m.error);
+  return { clip: d.name, bpm: r.bpm, confidence: r.confidence, markers: m.data.markers };
+}
+
+function framesFolder(): string {
+  if (!window.require) throw new Error('Node.js is not enabled in this panel');
+  const os = window.require('os'), path = window.require('path'), fs = window.require('fs');
+  const dir = path.join(os.homedir(), 'Pictures', 'UET Frames');
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+async function exportFrameAction(p: { importToProject: boolean }) {
+  const r = await callHost<any>('ppro', 'exportFrame', { folder: framesFolder(), importToProject: p.importToProject });
+  if (!r.ok) throw new Error(r.error);
+  return r.data;
+}
+
+const TIDY_KEY = 'uet.tidy.lastMoved';
+async function tidyAction(p: { dryRun: boolean }) {
+  const r = await callHost<any>('ppro', 'tidyProject', { dryRun: p.dryRun });
+  if (!r.ok) throw new Error(r.error);
+  if (!p.dryRun && r.data.moved.length) localStorage.setItem(TIDY_KEY, JSON.stringify(r.data.moved));
+  return r.data;
+}
+
+async function untidyAction() {
+  const moved = JSON.parse(localStorage.getItem(TIDY_KEY) ?? '[]');
+  if (!moved.length) throw new Error('Geri alınacak düzenleme yok.');
+  const r = await callHost<any>('ppro', 'untidyProject', { moved });
+  if (!r.ok) throw new Error(r.error);
+  localStorage.removeItem(TIDY_KEY);
+  return r.data;
+}
+
+const DUCK_KEY = 'uet.duck.last';
+async function duckAction(p: { trackIndex: number; duckDb: number; fade: number }) {
+  if (!engine) throw new Error('Engine not running');
+  const info = await callHost<any>('ppro', 'getSelectedClipInfo');
+  if (!info.ok) throw new Error(info.error);
+  const d = info.data;
+  const a = await engine.call('audio.planSilenceCut', { file: d.mediaPath, minSilence: 0.4, padding: 0.05, fps: d.sequenceFps });
+  // speech = used part of the media minus silences, moved to timeline time
+  const off = d.timelineStart - d.sourceIn;
+  const speech = invertRanges(a.cut, a.duration)
+    .map((r: any) => ({ start: Math.max(r.start, d.sourceIn), end: Math.min(r.end, d.sourceOut) }))
+    .filter((r: any) => r.end > r.start)
+    .map((r: any) => ({ start: r.start + off, end: r.end + off }));
+  const keys = planDucking(speech, { duckDb: p.duckDb, attack: p.fade, release: p.fade * 1.6 });
+  const r = await callHost<any>('ppro', 'duckTrack', { trackIndex: p.trackIndex, keys });
+  if (!r.ok) throw new Error(r.error);
+  if (r.data.touched.length) localStorage.setItem(DUCK_KEY, JSON.stringify({ trackIndex: p.trackIndex, touched: r.data.touched }));
+  return { clip: d.name, speechParts: speech.length, ...r.data };
+}
+
+async function unduckAction() {
+  const last = JSON.parse(localStorage.getItem(DUCK_KEY) ?? 'null');
+  if (!last) throw new Error('Geri alınacak kısma yok.');
+  const r = await callHost<any>('ppro', 'unduckTrack', last);
+  if (!r.ok) throw new Error(r.error);
+  localStorage.removeItem(DUCK_KEY);
+  return r.data;
+}
+
+async function reframeAction(p: { width: number; height: number; mode: 'fill' | 'fit' }) {
+  const r = await callHost<any>('ppro', 'reframeSequence', p);
+  if (!r.ok) throw new Error(r.error);
+  return r.data;
+}
+
+async function applyRecipeById(p: { recipeId: string; duration?: number; stagger: number }) {
+  const base = BUILTIN_RECIPES.find(x => x.id === p.recipeId);
+  if (!base) throw new Error(`Unknown recipe ${p.recipeId}`);
+  const recipe = retimeRecipe(base, p.duration ?? base.duration);
+  const r = await callHost<any>('ae', 'applyRecipe', { recipe, stagger: p.stagger });
+  if (!r.ok) throw new Error(r.error);
+  return r.data;
+}
+
+/** Tools that act on the open Adobe app. Registered into the in-panel Engine so MCP clients can use them. */
+function registerHostTools(reg: any) {
+  for (const m of MODULES) { try { m.registerTools?.(reg, moduleContext()); } catch (e) { log(`Modül ${m.id} araçları: ${(e as Error).message}`, 'err'); } }
+  if (hostApp === 'PPRO') {
+    reg.register({
+      id: 'ppro.cutSilences', app: 'ppro', destructive: true,
+      title: { en: 'Find silences in the selected clip; optionally add markers or build a new cut sequence (original untouched)', tr: 'Sessizlikleri kes' },
+      params: z.object({ mode: z.enum(['analyze', 'markers', 'newSequence']).default('analyze'), minSilence: z.number().min(0.1).default(0.5), padding: z.number().min(0).max(1).default(0.12), thresholdDb: z.number().max(0).optional() }),
+      run: cutSilences,
+    });
+    reg.register({
+      id: 'ppro.detectScenes', app: 'ppro', destructive: true,
+      title: { en: 'Find shot changes in the selected clip; add markers or build a new sequence split at each cut (original untouched)', tr: 'Sahne bulucu' },
+      params: z.object({ threshold: z.number().min(0.05).max(0.9).default(0.3), mode: z.enum(['analyze', 'markers', 'newSequence']).default('markers') }),
+      run: detectScenesAction,
+    });
+    reg.register({
+      id: 'ppro.beatMarkers', app: 'ppro', destructive: true,
+      title: { en: 'Detect tempo of the selected music clip and add sequence markers on beats', tr: 'Vuruş marker' },
+      params: z.object({ every: z.number().int().min(1).max(16).default(4) }),
+      run: beatMarkersAction,
+    });
+    reg.register({
+      id: 'ppro.exportFrame', app: 'ppro', destructive: false,
+      title: { en: 'Save the frame under the playhead as PNG (~/Pictures/UET Frames), optionally import it', tr: 'Kare dışa aktar' },
+      params: z.object({ importToProject: z.boolean().default(false) }),
+      run: exportFrameAction,
+    });
+    reg.register({
+      id: 'ppro.tidyProject', app: 'ppro', destructive: true,
+      title: { en: 'Sort root-level project items into bins by type (dryRun to preview); undo with ppro.untidyProject', tr: 'Proje düzeni' },
+      params: z.object({ dryRun: z.boolean().default(true) }),
+      run: tidyAction,
+    });
+    reg.register({
+      id: 'ppro.untidyProject', app: 'ppro', destructive: true,
+      title: { en: 'Undo the last project tidy (items back to root, empty UET bins removed)', tr: 'Proje düzenini geri al' },
+      params: z.object({}),
+      run: untidyAction,
+    });
+    reg.register({
+      id: 'ppro.reframe', app: 'ppro', destructive: true,
+      title: { en: 'Copy the active sequence to a new frame size (e.g. 1080x1920 for Reels) and rescale clips to fill or fit; original untouched', tr: 'Dikey format' },
+      params: z.object({ width: z.number().int().min(64).max(8192).default(1080), height: z.number().int().min(64).max(8192).default(1920), mode: z.enum(['fill', 'fit']).default('fill') }),
+      run: reframeAction,
+    });
+    reg.register({
+      id: 'ppro.duckMusic', app: 'ppro', destructive: true,
+      title: { en: 'Lower music (an audio track) wherever the selected dialogue clip has speech, using volume keyframes; undo with ppro.unduckMusic', tr: 'Müzik kısma' },
+      params: z.object({ trackIndex: z.number().int().min(0).default(1).describe('0-based audio track index of the music (1 = A2)'), duckDb: z.number().min(-40).max(-1).default(-12), fade: z.number().min(0.05).max(2).default(0.3) }),
+      run: duckAction,
+    });
+    reg.register({
+      id: 'ppro.unduckMusic', app: 'ppro', destructive: true,
+      title: { en: 'Undo the last music ducking', tr: 'Müzik kısmayı geri al' },
+      params: z.object({}),
+      run: unduckAction,
+    });
+  } else if (hostApp === 'AEFT') {
+    reg.register({
+      id: 'ae.applyRecipe', app: 'ae', destructive: true,
+      title: { en: `Animate the selected layers. Recipes: ${BUILTIN_RECIPES.map(r => r.id).join(', ')}`, tr: 'Animasyon uygula' },
+      params: z.object({ recipeId: z.enum(BUILTIN_RECIPES.map(r => r.id) as [string, ...string[]]), duration: z.number().positive().optional(), stagger: z.number().min(0).default(0.08) }),
+      run: applyRecipeById,
+    });
+  }
+}
+
+function setupPremiere() {
+  const analyze = $<HTMLButtonElement>('analyze');
+  analyze.onclick = busy(analyze, async () => {
+    const th = $<HTMLInputElement>('threshold').value;
+    const r = await cutSilences({ mode: 'analyze', minSilence: Number($<HTMLInputElement>('minSilence').value), padding: Number($<HTMLInputElement>('padding').value), thresholdDb: th === '' ? undefined : Number(th) });
+    log(`${r.clip}: gürültü tabanı ${r.noiseFloorDb} dB, eşik ${r.thresholdDb} dB. ${r.cuts} kesim, ${r.removedSeconds} sn çıkarılacak.`, 'ok');
+    $<HTMLButtonElement>('markers').disabled = false;
+    $<HTMLButtonElement>('rebuild').disabled = false;
+  });
+  const markers = $<HTMLButtonElement>('markers');
+  markers.onclick = busy(markers, async () => {
+    if (!lastPlan) return;
+    report(await callHost('ppro', 'addMarkers', { ranges: lastPlan.cut, name: 'UET sessizlik', useSelection: true }), d => `${d.markers} marker eklendi.`);
+  });
+  const rebuild = $<HTMLButtonElement>('rebuild');
+  rebuild.onclick = busy(rebuild, async () => {
+    if (!lastPlan) return;
+    report(await callHost('ppro', 'buildFromRanges', { keep: lastPlan.keep }), d => `Yeni sekans: "${d.sequence}" (${d.clips} parça, ${d.duration.toFixed(1)} sn). Orijinal "${d.original}" değişmedi.`);
+  });
+  const loud = $<HTMLButtonElement>('loudness');
+  loud.onclick = busy(loud, async () => {
+    if (!engine) throw new Error('Motor çalışmıyor.');
+    const info = await callHost<any>('ppro', 'getSelectedClipInfo');
+    if (!info.ok) { report(info, () => ''); return; }
+    const r = await engine.call('audio.measureLoudness', { file: info.data.mediaPath, targetLufs: Number($<HTMLSelectElement>('lufs').value) });
+    log(`${info.data.name}: ${r.integratedLufs} LUFS, tepe ${r.truePeakDb} dBTP. Hedef için kazanç: ${r.gainDb > 0 ? '+' : ''}${r.gainDb} dB.`, 'ok');
+  });
+  const sc = $<HTMLButtonElement>('scenesBtn');
+  sc.onclick = busy(sc, async () => {
+    log('Sahneler aranıyor...');
+    const r = await detectScenesAction({ threshold: Number($<HTMLSelectElement>('sceneTh').value), mode: $<HTMLSelectElement>('sceneMode').value as any });
+    log(`${r.clip}: ${r.scenes} sahne değişimi bulundu.${r.markers ? ` ${r.markers} marker eklendi.` : ''}${r.newSequence ? ` Yeni sekans: "${r.newSequence}".` : ''}`, 'ok');
+  });
+  const bt = $<HTMLButtonElement>('beatsBtn');
+  bt.onclick = busy(bt, async () => {
+    log('Vuruşlar aranıyor...');
+    const r = await beatMarkersAction({ every: Number($<HTMLSelectElement>('beatEvery').value) });
+    log(`${r.clip}: ${r.bpm} BPM. ${r.markers} vuruş marker'ı eklendi.`, 'ok');
+  });
+  const fb = $<HTMLButtonElement>('frameBtn');
+  fb.onclick = busy(fb, async () => {
+    const r = await exportFrameAction({ importToProject: $<HTMLInputElement>('frameImport').checked });
+    log(r.exists ? `Kare kaydedildi (${r.timecode}): ${r.path}${r.imported ? ' · projeye eklendi' : ''}` : `Premiere kareyi yazmadı: ${r.path}`, r.exists ? 'ok' : 'err');
+  });
+  $('frameOpen').onclick = () => { try { window.require!('child_process').exec(`open "${framesFolder()}"`); } catch (e) { log((e as Error).message, 'err'); } };
+  const describeBins = (b: Record<string, number>) => Object.entries(b).map(([k, v]) => `${k.replace('UET ', '')}: ${v}`).join(', ');
+  const tp = $<HTMLButtonElement>('tidyPreview');
+  tp.onclick = busy(tp, async () => { const r = await tidyAction({ dryRun: true }); log(r.items ? `${r.items} öğe taşınacak → ${describeBins(r.bins)}` : 'Üst seviyede taşınacak öğe yok.', 'ok'); });
+  const tb = $<HTMLButtonElement>('tidyBtn');
+  const ub = $<HTMLButtonElement>('untidyBtn');
+  ub.disabled = !localStorage.getItem(TIDY_KEY);
+  tb.onclick = busy(tb, async () => { const r = await tidyAction({ dryRun: false }); log(`${r.moved.length} öğe klasörlere taşındı → ${describeBins(r.bins)}`, 'ok'); ub.disabled = !r.moved.length; });
+  ub.onclick = busy(ub, async () => { const r = await untidyAction(); log(`${r.restored} öğe eski yerine döndü.`, 'ok'); ub.disabled = true; });
+  const rf = $<HTMLButtonElement>('rfBtn');
+  rf.onclick = busy(rf, async () => {
+    const [w, h] = $<HTMLSelectElement>('rfFormat').value.split('x').map(Number);
+    const r = await reframeAction({ width: w!, height: h!, mode: $<HTMLSelectElement>('rfMode').value as 'fill' | 'fit' });
+    log(`Yeni sekans: "${r.sequence}" (${r.width}×${r.height}), ${r.clips} klip ölçeklendi${r.skipped ? `, ${r.skipped} klip atlandı` : ''}. Orijinal "${r.original}" değişmedi.`, 'ok');
+  });
+  const db = $<HTMLButtonElement>('duckBtn'), udb = $<HTMLButtonElement>('unduckBtn');
+  udb.disabled = !localStorage.getItem(DUCK_KEY);
+  db.onclick = busy(db, async () => {
+    log('Konuşma aranıyor, müzik kısılıyor...');
+    const r = await duckAction({ trackIndex: Number($<HTMLSelectElement>('duckTrack').value), duckDb: Number($<HTMLInputElement>('duckDb').value), fade: Number($<HTMLInputElement>('duckFade').value) });
+    log(`${r.speechParts} konuşma bölümü · ${r.clips} müzik klibine ${r.keys} anahtar kare eklendi${r.skipped ? ` · ${r.skipped} klip atlandı (zaten anahtar karesi var)` : ''}.`, r.clips ? 'ok' : 'err');
+    udb.disabled = !r.clips;
+  });
+  udb.onclick = busy(udb, async () => { const r = await unduckAction(); log(`${r.restored} klip eski haline döndü.`, 'ok'); udb.disabled = true; });
+  $('pping').onclick = async () => report(await callHost('ppro', 'ping'), d => `Premiere ${d.version} (build ${d.build}), sekans: ${d.sequence ?? 'yok'}`);
+  $('qe').onclick = async () => report(await callHost('ppro', 'qeProbe'), d => `QE: ${JSON.stringify(d)}`);
+}
+
+// ---------- After Effects ----------
+function setupAfterEffects() {
+  const sel = $<HTMLSelectElement>('recipe');
+  for (const r of BUILTIN_RECIPES) {
+    const o = document.createElement('option');
+    o.value = r.id; o.textContent = r.name;
+    sel.appendChild(o);
+  }
+  sel.onchange = () => { const r = BUILTIN_RECIPES.find(x => x.id === sel.value); if (r) $<HTMLInputElement>('recipeDur').value = String(r.duration); };
+  const apply = $<HTMLButtonElement>('applyRecipe');
+  apply.onclick = busy(apply, async () => {
+    const base = BUILTIN_RECIPES.find(x => x.id === sel.value)!;
+    const recipe = retimeRecipe(base, Number($<HTMLInputElement>('recipeDur').value) || base.duration);
+    report(await callHost('ae', 'applyRecipe', { recipe, stagger: Number($<HTMLInputElement>('stagger').value) || 0 }), d => `"${base.name}" uygulandı: ${d.layers.join(', ')}`);
+  });
+  const ramp = $<HTMLButtonElement>('applyRamp');
+  ramp.onclick = busy(ramp, async () => {
+    const info = await evalHost<any>(`(function(){var c=app.project.activeItem;var l=c&&c.selectedLayers&&c.selectedLayers[0];if(!l)return JSON.stringify({ok:false,error:'Bir video katmanı seç.'});return JSON.stringify({ok:true,data:{inP:l.inPoint,outP:l.outPoint,start:l.startTime}});})()`);
+    if (!info.ok) { report(info, () => ''); return; }
+    // Source time currently shown on the layer (no remap yet): inPoint-startTime .. outPoint-startTime
+    const keys = buildRampKeyframes({
+      sourceStart: info.data.inP - info.data.start,
+      sourceEnd: info.data.outP - info.data.start,
+      targetSpeed: Number($<HTMLInputElement>('rampSpeed').value) / 100,
+      rampFraction: Number($<HTMLInputElement>('rampFrac').value) / 100,
+      shape: $<HTMLSelectElement>('rampShape').value as 'in' | 'out' | 'both',
+      ease: $<HTMLSelectElement>('rampEase').value as 'easeInOut',
+    });
+    report(await callHost('ae', 'speedRamp', { keys }), d => `Rampa: ${d.keys} anahtar kare, yeni süre ${d.outputDuration.toFixed(2)} sn.`);
+  });
+  $('aping').onclick = async () => report(await callHost('ae', 'ping'), d => `After Effects ${d.version}`);
+  $('testTitle').onclick = async () => {
+    const r = await callHost('ae', 'createTestTitle', { text: 'Ultimate Editor Toolkit' });
+    report(r, d => `"${d.comp}" oluşturuldu. Şimdi Animasyon sekmesinden bir giriş uygula.`);
+  };
+}
+
+async function init() {
+  setupShell();
+  if (hostApp === 'BROWSER') { $('status').textContent = 'Tarayıcı önizlemesi: Adobe bağlantısı yok.'; return; }
+  await loadHostLibrary();
+  if (hostApp === 'PPRO') setupPremiere(); else setupAfterEffects();
+  const ctx = moduleContext();
+  for (const m of MODULES) {
+    try {
+      for (const j of m.jsx ?? []) await ctx.loadJsx(j);
+      await m.setup?.(ctx);
+    } catch (e) { log(`Modül ${m.id}: ${(e as Error).message}`, 'err'); }
+  }
+  await startEngine();
+}
+init();

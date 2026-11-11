@@ -1,0 +1,34 @@
+{
+	"systeminfo": "fixture",
+	"model": { "type": "base", "multilingual": true },
+	"params": { "model": "ggml-base.bin", "language": "auto", "translate": false },
+	"result": { "language": "tr" },
+	"transcription": [
+		{
+			"timestamps": { "from": "00:00:00,000", "to": "00:00:02,400" },
+			"offsets": { "from": 0, "to": 2400 },
+			"text": " Merhaba arkadaşlar, bugün",
+			"tokens": [
+				{ "text": "[_BEG_]", "timestamps": { "from": "00:00:00,000", "to": "00:00:00,000" }, "offsets": { "from": 0, "to": 0 }, "id": 50365, "p": 0.98, "t_dtw": -1 },
+				{ "text": " Mer", "offsets": { "from": 0, "to": 300 }, "id": 1, "p": 0.9, "t_dtw": -1 },
+				{ "text": "haba", "offsets": { "from": 300, "to": 600 }, "id": 2, "p": 0.8, "t_dtw": -1 },
+				{ "text": " arkadaşlar", "offsets": { "from": 700, "to": 1400 }, "id": 3, "p": 0.95, "t_dtw": -1 },
+				{ "text": ",", "offsets": { "from": 1400, "to": 1450 }, "id": 4, "p": 0.99, "t_dtw": -1 },
+				{ "text": " bugün", "offsets": { "from": 1600, "to": 2400 }, "id": 5, "p": 0.97, "t_dtw": -1 },
+				{ "text": "[_TT_120]", "offsets": { "from": 2400, "to": 2400 }, "id": 50485, "p": 0.5, "t_dtw": -1 }
+			]
+		},
+		{
+			"timestamps": { "from": "00:00:03,500", "to": "00:00:05,000" },
+			"offsets": { "from": 3500, "to": 5000 },
+			"text": " yeni bir eklenti deniyoruz.",
+			"tokens": [
+				{ "text": " yeni", "offsets": { "from": 3500, "to": 3800 }, "id": 6, "p": 0.99, "t_dtw": -1 },
+				{ "text": " bir", "offsets": { "from": 3800, "to": 4000 }, "id": 7, "p": 0.99, "t_dtw": -1 },
+				{ "text": " eklenti", "offsets": { "from": 4000, "to": 4500 }, "id": 8, "p": 0.7, "t_dtw": -1 },
+				{ "text": " deniyoruz", "offsets": { "from": 4500, "to": 4950 }, "id": 9, "p": 0.9, "t_dtw": -1 },
+				{ "text": ".", "offsets": { "from": 4950, "to": 5000 }, "id": 10, "p": 0.99, "t_dtw": -1 }
+			]
+		}
+	]
+}

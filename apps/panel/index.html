@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Ultimate Editor Toolkit</title>
+<style>
+  :root {
+    --bg:#121317; --bg2:#181a20; --card:#1e2028; --card2:#252834; --line:#2c2f3a; --text:#eceef3; --muted:#8a90a0;
+    --accent:#ff7a45; --accent2:#ff4d8d; --ok:#3ecf8e; --err:#ff6b6b; --warn:#ffd166; --r:10px;
+  }
+  * { box-sizing:border-box; }
+  html, body { height:100%; }
+  body { margin:0; font:12px -apple-system, "SF Pro Text", "Segoe UI", sans-serif; background:var(--bg); color:var(--text); display:flex; flex-direction:column; overflow:hidden; }
+  button { font:inherit; }
+  /* Top bar */
+  .top { display:flex; align-items:center; gap:8px; padding:10px 12px 8px; }
+  .logo { width:26px; height:26px; border-radius:8px; background:linear-gradient(135deg,var(--accent),var(--accent2)); display:grid; place-items:center; font-weight:800; font-size:13px; color:#fff; box-shadow:0 4px 14px rgba(255,90,90,.35); flex:none; }
+  .brand { display:flex; flex-direction:column; line-height:1.15; min-width:0; }
+  .brand b { font-size:12.5px; letter-spacing:.2px; white-space:nowrap; }
+  .brand span { color:var(--muted); font-size:10.5px; }
+  .spacer { flex:1; }
+  .pill { font-size:10px; padding:3px 8px; border-radius:20px; background:var(--card); border:1px solid var(--line); color:var(--muted); white-space:nowrap; }
+  .pill i { display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--muted); margin-right:5px; vertical-align:1px; }
+  .pill.okc i { background:var(--ok); box-shadow:0 0 6px var(--ok); } .pill.errc i { background:var(--err); }
+  /* Search */
+  .search { margin:0 12px 8px; position:relative; }
+  .search input { width:100%; padding:9px 12px 9px 32px; border-radius:var(--r); border:1px solid var(--line); background:var(--bg2); color:var(--text); outline:none; }
+  .search input:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(255,122,69,.15); }
+  .search svg { position:absolute; left:11px; top:50%; transform:translateY(-50%); opacity:.55; }
+  .search kbd { position:absolute; right:9px; top:50%; transform:translateY(-50%); font:10px Menlo, monospace; color:var(--muted); border:1px solid var(--line); border-radius:4px; padding:1px 5px; }
+  /* Category chips */
+  .chips { display:flex; gap:6px; padding:0 12px 10px; overflow-x:auto; scrollbar-width:none; flex:none; }
+  .chips::-webkit-scrollbar { display:none; }
+  .chip { flex:none; padding:5px 11px; border-radius:20px; border:1px solid var(--line); background:transparent; color:var(--muted); cursor:pointer; }
+  .chip.on { color:#111; background:var(--c, var(--text)); border-color:transparent; font-weight:600; }
+  /* Grid */
+  main { flex:1; overflow-y:auto; padding:0 12px 12px; }
+  .group { margin:6px 0 4px; color:var(--muted); font-size:10.5px; text-transform:uppercase; letter-spacing:.8px; display:flex; align-items:center; gap:6px; }
+  .group::before { content:''; width:6px; height:6px; border-radius:2px; background:var(--c); }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(132px, 1fr)); gap:8px; margin-bottom:10px; }
+  .card { position:relative; display:flex; flex-direction:column; justify-content:flex-start; align-items:stretch; text-align:left; padding:0; border-radius:var(--r); background:var(--card); border:1px solid var(--line); color:var(--text); cursor:pointer; overflow:hidden; transition:transform .12s, border-color .12s, background .12s; }
+  .card:hover { transform:translateY(-1px); border-color:var(--c); background:var(--card2); }
+  .card.soon { cursor:default; opacity:.5; filter:saturate(.6); }
+  .card.soon .pv * { animation:none !important; }
+  .card.soon:hover { transform:none; border-color:var(--line); background:var(--card); }
+  .card .pv { height:58px; position:relative; overflow:hidden; background:radial-gradient(120% 90% at 20% 0%, var(--cg), transparent 70%), var(--bg2); }
+  .card .meta { padding:8px 9px 9px; }
+  .card b { display:block; font-size:12px; margin-bottom:3px; }
+  .card p { margin:0; color:var(--muted); font-size:10.5px; line-height:1.35; }
+  .badge { position:absolute; top:6px; right:6px; font-size:9px; padding:2px 6px; border-radius:10px; background:rgba(0,0,0,.45); color:var(--muted); backdrop-filter:blur(4px); }
+  .badge.beta { color:var(--warn); } .badge.dev { color:#9aa4b2; }
+  .star { position:absolute; top:4px; left:6px; font-size:12px; color:#555b6b; background:none; border:0; cursor:pointer; padding:0; }
+  .star.on { color:var(--warn); }
+  .empty { color:var(--muted); text-align:center; padding:30px 0; }
+  /* Previews (pure CSS, no assets) */
+  .pv .bars { position:absolute; inset:14px 12px; display:flex; align-items:center; gap:2px; }
+  .pv .bars span { flex:1; background:var(--c); border-radius:2px; opacity:.85; animation:bar 1.4s ease-in-out infinite; }
+  .pv .bars span.gap { opacity:.15; animation:none; height:3px !important; }
+  @keyframes bar { 50% { transform:scaleY(.55); } }
+  .pv .meter { position:absolute; left:14px; right:14px; top:24px; height:8px; border-radius:6px; background:#2a2d38; overflow:hidden; }
+  .pv .meter::after { content:''; position:absolute; inset:0; width:70%; background:linear-gradient(90deg,var(--ok),var(--warn) 75%,var(--err)); animation:meter 2s ease-in-out infinite; }
+  @keyframes meter { 50% { width:84%; } }
+  .pv .cap { position:absolute; left:50%; bottom:12px; transform:translateX(-50%); font-weight:800; font-size:12px; white-space:nowrap; text-shadow:0 2px 6px #000; }
+  .pv .cap em { font-style:normal; color:var(--c); animation:kar 2s steps(1) infinite; }
+  @keyframes kar { 50% { color:#fff; } }
+  .pv .box { position:absolute; left:50%; top:50%; width:24px; height:24px; margin:-12px; border-radius:6px; background:var(--c); animation:pop 1.6s cubic-bezier(.34,1.56,.64,1) infinite; }
+  @keyframes pop { 0%,15% { transform:scale(0); opacity:0; } 45%,85% { transform:scale(1); opacity:1; } 100% { transform:scale(0); opacity:0; } }
+  .pv svg.curve { position:absolute; inset:8px 12px; width:calc(100% - 24px); height:calc(100% - 16px); }
+  .pv svg.curve path { fill:none; stroke:var(--c); stroke-width:2.2; stroke-dasharray:200; animation:draw 2.4s ease-in-out infinite; }
+  @keyframes draw { 0% { stroke-dashoffset:200; } 60%,100% { stroke-dashoffset:0; } }
+  .pv .title { position:absolute; left:12px; top:16px; right:12px; }
+  .pv .title i { display:block; height:7px; border-radius:4px; background:var(--c); margin-bottom:5px; animation:slide 2s ease-out infinite; }
+  .pv .title i:nth-child(2) { width:60%; opacity:.5; animation-delay:.15s; }
+  @keyframes slide { 0% { transform:translateX(-110%); } 35%,100% { transform:none; } }
+  .pv .wipe { position:absolute; inset:0; background:linear-gradient(100deg, transparent 40%, var(--c) 50%, transparent 60%); background-size:250% 100%; animation:wipe 1.8s linear infinite; opacity:.7; }
+  @keyframes wipe { from { background-position:150% 0; } to { background-position:-50% 0; } }
+  .pv .cells { position:absolute; inset:12px 16px; display:grid; grid-template-columns:repeat(4,1fr); gap:4px; }
+  .pv .cells i { border-radius:3px; background:var(--c); opacity:.25; }
+  .pv .cells i:nth-child(3n) { opacity:.6; }
+  .pv .spark i { position:absolute; width:5px; height:5px; border-radius:50%; background:var(--c); box-shadow:0 0 10px var(--c); animation:float 3s ease-in-out infinite; }
+  @keyframes float { 50% { transform:translateY(-8px); opacity:.4; } }
+  .pv .code { position:absolute; left:12px; top:14px; font:10px Menlo, monospace; color:var(--c); opacity:.8; }
+  /* Tool view */
+  .view { display:none; padding:2px 0 8px; }
+  .view.on { display:block; }
+  .vhead { display:flex; align-items:center; gap:8px; margin:2px 0 10px; }
+  .back { border:1px solid var(--line); background:var(--card); color:var(--text); border-radius:8px; width:28px; height:28px; cursor:pointer; }
+  .vhead b { font-size:14px; }
+  .vhead .badge { position:static; }
+  .presets { display:flex; gap:6px; align-items:center; margin:0 0 8px; }
+  .presets select { flex:1; width:auto; }
+  .presets input { flex:1; background:var(--bg2); color:var(--text); border:1px solid var(--line); border-radius:7px; padding:5px 7px; }
+  .mini { background:var(--card2); color:var(--text); border:1px solid var(--line); border-radius:7px; padding:5px 9px; cursor:pointer; white-space:nowrap; }
+  .box2 { background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:10px 12px; margin-bottom:8px; }
+  label { display:flex; justify-content:space-between; align-items:center; margin:7px 0; gap:8px; color:#cfd3dc; }
+  input[type=number], select { background:var(--bg2); color:var(--text); border:1px solid var(--line); border-radius:7px; padding:5px 7px; width:130px; }
+  input[type=checkbox] { accent-color:var(--accent); }
+  .btn { display:block; width:100%; margin-top:8px; padding:10px; background:linear-gradient(135deg,var(--accent),#ff5a5a); color:#fff; border:0; border-radius:9px; font-weight:700; cursor:pointer; letter-spacing:.2px; }
+  .btn.secondary { background:var(--card2); color:var(--text); border:1px solid var(--line); font-weight:600; }
+  .btn:disabled { opacity:.45; cursor:default; }
+  .note { color:var(--muted); font-size:11px; line-height:1.45; margin:0 0 6px; }
+  /* Status bar + log */
+  footer { flex:none; border-top:1px solid var(--line); background:var(--bg2); }
+  .bar { display:flex; align-items:center; gap:8px; padding:6px 12px; color:var(--muted); font-size:10.5px; }
+  .bar button { background:none; border:0; color:var(--muted); cursor:pointer; }
+  #log { display:none; max-height:150px; overflow:auto; padding:6px 12px 8px; font:10.5px Menlo, monospace; white-space:pre-wrap; border-top:1px solid var(--line); }
+  #log.open { display:block; }
+  #toast { position:fixed; left:12px; right:12px; bottom:40px; padding:9px 11px; border-radius:9px; background:#262a35; border:1px solid var(--line); box-shadow:0 8px 24px rgba(0,0,0,.4); font-size:11.5px; display:none; }
+  #toast.show { display:block; } #toast.okc { border-color:var(--ok); } #toast.errc { border-color:var(--err); }
+  .okc { color:var(--ok); } .errc { color:var(--err); }
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="logo">U</div>
+  <div class="brand"><b>Editor Toolkit</b><span id="hostName">Premiere Pro</span></div>
+  <div class="spacer"></div>
+  <span class="pill" id="engine"><i></i>motor</span>
+</div>
+<div class="search">
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+  <input id="q" placeholder="Araç ara… (ör. altyazı, sessizlik, rampa)" autocomplete="off">
+  <kbd>⌘K</kbd>
+</div>
+<div class="chips" id="chips"></div>
+
+<main id="main">
+  <div id="home"></div>
+
+  <!-- Tool views (Premiere) -->
+  <section class="view" id="v-silence" data-app="PPRO">
+    <div class="box2">
+      <p class="note">Zaman çizelgesinde bir klip seç. Analiz Mac'inde yapılır, orijinal sekans değişmez.</p>
+      <label>En kısa sessizlik (sn) <input id="minSilence" type="number" step="0.1" value="0.5"></label>
+      <label>Pay (sn) <input id="padding" type="number" step="0.02" value="0.12"></label>
+      <label>Eşik (dB) <input id="threshold" type="number" step="1" placeholder="otomatik"></label>
+    </div>
+    <button class="btn" id="analyze">1 · Sessizlikleri bul</button>
+    <button class="btn secondary" id="markers" disabled>2a · Marker olarak işaretle</button>
+    <button class="btn secondary" id="rebuild" disabled>2b · Kesilmiş yeni sekans oluştur</button>
+  </section>
+  <section class="view" id="v-scenes" data-app="PPRO">
+    <div class="box2">
+      <p class="note">Seçili klipte çekim değişimlerini bulur. Orijinal sekans değişmez.</p>
+      <label>Hassasiyet <select id="sceneTh"><option value="0.2">Yüksek</option><option value="0.3" selected>Normal</option><option value="0.45">Düşük</option></select></label>
+      <label>Çıktı <select id="sceneMode"><option value="markers">Marker koy</option><option value="newSequence">Parçalara bölünmüş yeni sekans</option><option value="analyze">Sadece say</option></select></label>
+    </div>
+    <button class="btn" id="scenesBtn">Sahneleri bul</button>
+  </section>
+  <section class="view" id="v-beats" data-app="PPRO">
+    <div class="box2">
+      <p class="note">Seçili müzik klibinin temposunu bulur ve vuruşlara sekans marker'ı koyar.</p>
+      <label>Sıklık <select id="beatEvery"><option value="1">Her vuruş</option><option value="2">2 vuruşta bir</option><option value="4" selected>Her ölçü (4 vuruş)</option><option value="8">8 vuruşta bir</option></select></label>
+    </div>
+    <button class="btn" id="beatsBtn">Vuruşları bul ve işaretle</button>
+  </section>
+  <section class="view" id="v-duck" data-app="PPRO">
+    <div class="box2">
+      <p class="note">Konuşma klibini seç. Konuşma olan yerlerde müzik izindeki kliplere ses anahtar karesi ekler. Zaten anahtar karesi olan kliplere dokunmaz.</p>
+      <label>Müzik izi <select id="duckTrack"><option value="1" selected>A2</option><option value="2">A3</option><option value="3">A4</option><option value="0">A1</option></select></label>
+      <label>Kısma (dB) <input id="duckDb" type="number" step="1" value="-12"></label>
+      <label>Yumuşak geçiş (sn) <input id="duckFade" type="number" step="0.05" value="0.3"></label>
+    </div>
+    <button class="btn" id="duckBtn">Müziği kıs</button>
+    <button class="btn secondary" id="unduckBtn" disabled>Geri al</button>
+  </section>
+  <section class="view" id="v-reframe" data-app="PPRO">
+    <div class="box2">
+      <p class="note">Aktif sekansın kopyasını yeni boyutta kurar ve klipleri ölçekler. Orijinal sekans değişmez. Anahtar kareli ölçeği olan kliplere dokunmaz.</p>
+      <label>Format <select id="rfFormat"><option value="1080x1920" selected>9:16 · Reels, Shorts, TikTok</option><option value="1080x1080">1:1 · Kare</option><option value="1080x1350">4:5 · Instagram akış</option><option value="1920x1080">16:9 · YouTube</option></select></label>
+      <label>Yerleşim <select id="rfMode"><option value="fill" selected>Doldur (kenarları kırp)</option><option value="fit">Sığdır (boşluk kalır)</option></select></label>
+    </div>
+    <button class="btn" id="rfBtn">Yeni sekans oluştur</button>
+  </section>
+  <section class="view" id="v-loudness" data-app="PPRO">
+    <div class="box2">
+      <p class="note">Seçili klibin ses yüksekliğini ölçer (EBU R128).</p>
+      <label>Hedef <select id="lufs"><option value="-14">-14 LUFS · YouTube, Reels</option><option value="-16">-16 LUFS · Podcast</option><option value="-23">-23 LUFS · TV</option></select></label>
+    </div>
+    <button class="btn" id="loudness">Ölç</button>
+  </section>
+  <section class="view" id="v-frame" data-app="PPRO">
+    <div class="box2">
+      <p class="note">Oynatma kafasının olduğu kareyi PNG olarak Resimler/UET Frames klasörüne kaydeder.</p>
+      <label>Projeye de ekle <input id="frameImport" type="checkbox"></label>
+    </div>
+    <button class="btn" id="frameBtn">Kareyi kaydet</button>
+    <button class="btn secondary" id="frameOpen">Klasörü aç</button>
+  </section>
+  <section class="view" id="v-tidy" data-app="PPRO">
+    <div class="box2">
+      <p class="note">Projenin en üst seviyesindeki öğeleri Video, Audio, Images, Sequences, Graphics, Other klasörlerine taşır. Klasör içindekilere dokunmaz. Silme yok.</p>
+    </div>
+    <button class="btn secondary" id="tidyPreview">Önizle</button>
+    <button class="btn" id="tidyBtn">Düzenle</button>
+    <button class="btn secondary" id="untidyBtn" disabled>Geri al</button>
+  </section>
+  <section class="view" id="v-pdev" data-app="PPRO">
+    <p class="note">Geliştirme testleri. Projede değişiklik yapmaz.</p>
+    <button class="btn secondary" id="pping">Premiere bağlantısını test et</button>
+    <button class="btn secondary" id="qe">QE özelliklerini yokla</button>
+  </section>
+
+  <!-- Tool views (After Effects) -->
+  <section class="view" id="v-recipes" data-app="AEFT">
+    <div class="box2">
+      <p class="note">Seçili katmanlara uygular. Tek Cmd+Z ile geri alınır.</p>
+      <label>Animasyon <select id="recipe"></select></label>
+      <label>Süre (sn) <input id="recipeDur" type="number" step="0.05" value="0.6"></label>
+      <label>Kademe (sn) <input id="stagger" type="number" step="0.02" value="0.08"></label>
+    </div>
+    <button class="btn" id="applyRecipe">Uygula</button>
+  </section>
+  <section class="view" id="v-ramp" data-app="AEFT">
+    <div class="box2">
+      <p class="note">Seçili video katmanında düzenlenebilir Time Remap anahtar kareleri oluşturur.</p>
+      <label>Hedef hız (%) <input id="rampSpeed" type="number" value="300" min="10" max="400"></label>
+      <label>Rampa payı (%) <input id="rampFrac" type="number" value="30" min="5" max="50"></label>
+      <label>Şekil <select id="rampShape"><option value="both">giriş + çıkış</option><option value="in">sadece giriş</option><option value="out">sadece çıkış</option></select></label>
+      <label>Yumuşatma <select id="rampEase"><option>easeInOut</option><option>expoInOut</option><option>smooth</option><option>linear</option></select></label>
+    </div>
+    <button class="btn" id="applyRamp">Rampa uygula</button>
+  </section>
+  <section class="view" id="v-adev" data-app="AEFT">
+    <button class="btn secondary" id="aping">After Effects bağlantısını test et</button>
+    <button class="btn secondary" id="testTitle">Test kompozisyonu + başlık oluştur</button>
+  </section>
+</main>
+
+<footer>
+  <div class="bar"><span id="status">Hazır</span><div class="spacer"></div><button id="logToggle">Günlük ▾</button></div>
+  <div id="log"></div>
+</footer>
+<div id="toast"></div>
+<script src="panel.js"></script>
+</body>
+</html>
