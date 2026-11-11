@@ -30,6 +30,7 @@ yet → every host feature below is UNVERIFIED.**
 | Preset library v1 (T2-07/T2-09, F-PROD-05 base) | `core/src/preset.ts` (schema `uet.preset/1` + migration), `engine/src/library.ts` (~/.uet/library, folders, trash instead of delete, .uetpack import/export), MCP `library.*`; panel preset bar on every tool view (save/apply/delete current settings) | U tests pass; **unverified in Adobe** |
 | Reframe / Dikey Format (`ppro.reframe`), F-FMT-03 v1 | Clone active sequence → setSettings frame size → rescale Motion Scale of unkeyed clips (fill/fit); original untouched | Mock-DOM tests pass; **unverified in Premiere** (`setSettings` on a clone, Scale units). Smart subject-following reframe = later |
 | Transitions v2 (PR #6): 11 transitions in 7 families, all in both AE and Premiere (new: Circle, Film Burn; Premiere Zoom Out, Spin, Flash) | transitions module | U/G pass; **unverified in both apps**; Premiere keyframe time base open |
+| Subtitle follow-up (PR #7): corrections list, English translation, SRT → styled overlay, premium looks (stacked, keyword emphasis), retake detection (keeps last take), Bölüm Bulucu (chapter markers + YouTube chapter list, no AI; F-FMT-05) | subtitles module, MCP `ppro.chapters` | U/G pass; **unverified in Premiere** |
 | CI | `.github/workflows/ci.yml`: typecheck, ES3 check, tests (real ffmpeg), build, uploads the extension folder as an artifact | first run on push |
 | Dev build | `uet-panel-dev-0.1.9.zip` + `install-mac.sh` + Turkish test guide | Waiting for İso's Mac test |
 

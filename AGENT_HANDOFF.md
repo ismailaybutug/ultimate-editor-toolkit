@@ -33,6 +33,7 @@ How a module plugs into the panel without touching shared files (since 0.1.5):
   `package.json`): message the integrator with the exact change. Root docs: send a short summary; the integrator
   writes TEST_REPORT / PROJECT_STATUS / CHANGELOG entries.
 - Never install anything on İso's Mac or ask İso to test directly; the integrator batches installs and test asks.
+- İso (2026-11-11): ask him to install/test only at bigger milestones, not per build. Keep building; test on a throwaway project, never on his open client project.
 - Rules from CLAUDE.md apply: Turkish to İso, no fake functionality, nothing "done" without an H test.
 
 ## Roles
